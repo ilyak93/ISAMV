@@ -60,7 +60,7 @@ int main() {
         return 2;
     }
 
-    auto serialNumber2 = "";
+    auto serialNumber2 = "069A1912";
     auto wic2 = wic::findAndConnect(serialNumber2);
 
     if (!wic2) {
