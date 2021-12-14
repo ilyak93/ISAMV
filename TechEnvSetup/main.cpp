@@ -144,9 +144,13 @@ int main() {
 
     struct Frame {
         Frame(const void *pVoid, double d, int i, int w, int h, short bpp,
-              int sib) : frame_data((void*)(pVoid)), ts(d), data_size(i),
+              int sib) : ts(d), data_size(i),
                          width(w), height(h), bytes_per_pixel(bpp),
-                         stride_in_bytes(sib){}
+                         stride_in_bytes(sib){
+            frame_data = new uint8_t[w*h*bytes_per_pixel];
+            assert(frame_data != nullptr);
+            memcpy(frame_data, pVoid, w*h*bytes_per_pixel);
+        }
 
         void* frame_data = NULL;
         double ts = -1;
@@ -198,7 +202,7 @@ int main() {
         cout << p.fps() << endl;
     }
 
-    sleep_for(nanoseconds(20000000000));
+    sleep_for(nanoseconds(10000000000));
 
 
     /*
@@ -213,7 +217,7 @@ int main() {
     //Frame depth_frame0 = depth_frames[0];
 
     std::vector<Frame> rgb_frames = frames[3];
-    Frame color_frame = rgb_frames[15];
+    Frame color_frame = rgb_frames[237];
 
     uint8_t* ptr = (uint8_t*)color_frame.frame_data;
     int stride = color_frame.stride_in_bytes;
@@ -236,7 +240,7 @@ int main() {
                    color_frame.frame_data, color_frame.stride_in_bytes);
 
     std::vector<Frame> depth_frames = frames[0];
-    Frame depth_frame = depth_frames[15];
+    Frame depth_frame = depth_frames[237];
 
 
     int bpp = depth_frame.bytes_per_pixel;
@@ -258,13 +262,27 @@ int main() {
     cout << endl;
 
 
-    uint8_t* dd = (uint8_t*)depth_frame.frame_data;
-    int shorts_size = rows*cols*bpp / 2;
-    int size_oif_short = sizeof(short);
-    int val2 = d[50];
-    int count_non0 = 0;
-    int count_non0_2 = 0;
-    int same = 0;
+    uint8_t* dd =  new uint8_t[rows*cols];
+
+    for(int i = 0; i < rows; i++) {
+        for(int j = 0; j < cols; j++) {
+            dd[i*cols+j] = (uint8_t)round(d[i*cols+j] / 256);
+        }
+    }
+
+    vector<int> normilized_values(dd, dd + (rows*cols));
+    cout << "\nMin Element = "
+         << *min_element(normilized_values.begin(), normilized_values.end());
+
+    // Find the max element
+    cout << "\nMax Element = "
+         << *max_element(normilized_values.begin(), normilized_values.end());
+
+    cout << "\navg Element = "
+         << avg(normilized_values);
+
+    cout << endl;
+
 
     std::stringstream png_file;
     png_file << "./" << "Depth" << ".png";
@@ -273,15 +291,20 @@ int main() {
                    depth_frame.frame_data, depth_frame.stride_in_bytes);
 
     cv::Mat img_in(rows, cols, CV_16UC1, (void*)d);
-    cv::Mat img_color;
-    // Apply the colormap:
-    //cv::applyColorMap(img_in, img_color, cv::COLORMAP_JET);
     // Show the result:
     cv::imshow("image", img_in);
 
+    cv::Mat img2_in(rows, cols, CV_8UC1, (void*)dd);
+    cv::Mat dst;
+    equalizeHist( img2_in, dst );
+    cv::Mat img2_color;
+    // Apply the colormap:
+    cv::applyColorMap(dst, img2_color, cv::COLORMAP_JET);
+    // Show the result:
+    cv::imshow("heatmap", img2_color);
     cv::waitKey(0);
-
     cv::destroyAllWindows();
+
 
     vector<int> compression_params;
     compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
