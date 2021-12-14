@@ -143,26 +143,38 @@ int main() {
     using namespace chrono; // nanoseconds, system_clock, seconds
 
     struct Frame {
-        Frame(const void *pVoid, double d, int i) : frame_data((void*)(pVoid)), ts(d), data_size(i) {}
+        Frame(const void *pVoid, double d, int i, int w, int h, short bpp,
+              int sib) : frame_data((void*)(pVoid)), ts(d), data_size(i),
+                         width(w), height(h), bytes_per_pixel(bpp),
+                         stride_in_bytes(sib){}
 
         void* frame_data = NULL;
-        double ts = 0;
+        double ts = -1;
         int data_size = -1;
+        int width = -1;
+        int height = -1;
+        short bytes_per_pixel = -1;
+        int stride_in_bytes = -1;
+
     };
 
     //std::map<int, std::vector<Frame>> frames;
-    std::map<int, std::vector<rs2::frame>> frames;
+    std::map<int, std::vector<Frame>> frames;
     std::mutex mutex;
     auto callback = [&](const rs2::frame& frame)
     {
         //std::lock_guard<std::mutex> lock(mutex);
         if (rs2::frameset fs = frame.as<rs2::frameset>()) {
-            rs2::disparity_transform disparity2depth(false);
+            //rs2::disparity_transform disparity2depth(false);
             //fs = fs.apply_filter(disparity2depth);
             // With callbacks, all synchronized stream will arrive in a single frameset
             for (const rs2::frame f : fs) {
-                //Frame my_f = Frame(f.get_data(), f.get_timestamp(), f.get_data_size());
-                frames[f.get_profile().unique_id()].push_back(f);
+                auto vf = f.as<rs2::video_frame>();
+                Frame my_f = Frame(vf.get_data(), vf.get_timestamp(),
+                                   vf.get_data_size(), vf.get_width(),
+                                   vf.get_height(), vf.get_bytes_per_pixel(),
+                                   vf.get_stride_in_bytes());
+                frames[f.get_profile().unique_id()].push_back(my_f);
             }
         } //else {
             // Stream that bypass synchronization (such as IMU) will produce single frames
@@ -200,13 +212,11 @@ int main() {
     //std::vector<Frame> depth_frames = frames[0];
     //Frame depth_frame0 = depth_frames[0];
 
-    std::vector<rs2::frame> depth_frames = frames[0];
+    std::vector<Frame> rgb_frames = frames[3];
+    Frame color_frame = rgb_frames[15];
 
-    std::vector<rs2::frame> rgb_frames = frames[3];
-    rs2::frame color_frame = rgb_frames[15];
-
-    uint8_t* ptr = (uint8_t*)color_frame.get_data();
-    int stride = color_frame.as<rs2::video_frame>().get_stride_in_bytes();
+    uint8_t* ptr = (uint8_t*)color_frame.frame_data;
+    int stride = color_frame.stride_in_bytes;
 
     int i2 = 100, j2 = 100; // fetch pixel 100,100
 
@@ -216,26 +226,25 @@ int main() {
     cout << endl;
 
     std::stringstream png_file2;
-    auto cf = color_frame.as<rs2::video_frame>();
 
-    int crows = cf.get_height(); //720
-    int ccols = cf.get_width(); // 1280
+    int crows = color_frame.height; //720
+    int ccols = color_frame.width; // 1280
 
-    png_file2 << "./" << cf.get_profile().stream_name() << ".png";
-    stbi_write_png(png_file2.str().c_str(), cf.get_width(), cf.get_height(),
-                   cf.get_bytes_per_pixel(), cf.get_data(), cf.get_stride_in_bytes());
+    png_file2 << "./" << "Color" << ".png";
+    stbi_write_png(png_file2.str().c_str(), color_frame.width,
+                   color_frame.height, color_frame.bytes_per_pixel,
+                   color_frame.frame_data, color_frame.stride_in_bytes);
 
-    auto df = depth_frames[15].as<rs2::depth_frame>();
+    std::vector<Frame> depth_frames = frames[0];
+    Frame depth_frame = depth_frames[15];
 
-    float val = df.get_distance(0,50);
 
-    int bpp = df.get_bits_per_pixel();
-    int bpp2 = df.get_bytes_per_pixel();
-    int sib = df.get_stride_in_bytes();
-    int rows = df.get_height(); //720
-    int cols = df.get_width(); // 1280
-    uint16_t* d = (uint16_t*)df.get_data();
-    vector<int> values(d, d + (df.get_data_size()/sizeof(uint16_t)));
+    int bpp = depth_frame.bytes_per_pixel;
+    int sib = depth_frame.stride_in_bytes;
+    int rows = depth_frame.height; //720
+    int cols = depth_frame.width; // 1280
+    uint16_t* d = (uint16_t*)depth_frame.frame_data;
+    vector<int> values(d, d + (rows*cols*bpp/sizeof(uint16_t)));
     cout << "\nMin Element = "
          << *min_element(values.begin(), values.end());
 
@@ -249,56 +258,26 @@ int main() {
     cout << endl;
 
 
-    uint8_t* dd = (uint8_t*)df.get_data();
-    int shorts_size = df.get_data_size() / 2;
+    uint8_t* dd = (uint8_t*)depth_frame.frame_data;
+    int shorts_size = rows*cols*bpp / 2;
     int size_oif_short = sizeof(short);
     int val2 = d[50];
     int count_non0 = 0;
     int count_non0_2 = 0;
     int same = 0;
-    /*
-    short* d3 = new short [rows*sib];
-
-    for(int i = 0; i < rows; i++){
-        for(int j = 0 ; j < cols ; j++){
-            //count_non0 += df.get_distance(i, j) > 0 ? 1 : 0;
-            count_non0_2 +=  d[i * sib + j] > 0 ? 1 : 0;
-            float dist = df.get_distance(i, j) * 1000;
-            float dist2 = float(d[i * sib + j]);
-            //same += df.get_distance(i, j) * 1000 == float(d[i * sib + j]);
-            //if (df.get_distance(i, j) * 1000 != d[i * sib + j]){
-            //   cout << df.get_distance(i, j) * 1000 << endl;
-            //   cout << d[i * sib + j] << endl;
-            //}
-            short b = d[i * sib + j];
-            short b2 = d[i * sib + j] / 256 ;
-            //d[i * w + j] = d[i * sib + j] / 256;
-            float ss = df.get_distance(i, j) * 1000 / 256;
-            float sss = round(df.get_distance(i, j) * 1000 / 256) ;
-            //d3[i * sib + j] = df.get_distance(i, j) * 1000 / 256  ;
-            //if (df.get_distance(i, j) != d[i * sib + j] && i % 100 == 0){
-            //    cout << df.get_distance(i, j) << endl;
-            //    cout << d[i * w + j] << endl;
-            //}
-        }
-    }
-    */
-
-
-
-    auto vf = depth_frames[0].as<rs2::video_frame>();
 
     std::stringstream png_file;
-    png_file << "./" << vf.get_profile().stream_name() << ".png";
-    stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(),
-                   vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
+    png_file << "./" << "Depth" << ".png";
+    stbi_write_png(png_file.str().c_str(), depth_frame.width,
+                   depth_frame.height, depth_frame.bytes_per_pixel,
+                   depth_frame.frame_data, depth_frame.stride_in_bytes);
 
     cv::Mat img_in(rows, cols, CV_16UC1, (void*)d);
     cv::Mat img_color;
     // Apply the colormap:
     //cv::applyColorMap(img_in, img_color, cv::COLORMAP_JET);
     // Show the result:
-    cv::imshow("colorMap", img_in);
+    cv::imshow("image", img_in);
 
     cv::waitKey(0);
 
