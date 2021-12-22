@@ -62,7 +62,7 @@ public:
 int main() {
 
 
-    auto serialNumber = "070A1912";
+    auto serialNumber = "";
     auto wic = wic::findAndConnect(serialNumber);
 
 
@@ -78,7 +78,7 @@ int main() {
         return 2;
     }
 
-    auto serialNumber2 = "069A1912";
+    auto serialNumber2 = "";
     auto wic2 = wic::findAndConnect(serialNumber2);
 
     if (!wic2) {

@@ -60,7 +60,8 @@ public:
 };
 
 int main() {
-    /*
+
+
     auto serialNumber = "070A1912";
     auto wic = wic::findAndConnect(serialNumber);
 
@@ -130,18 +131,18 @@ int main() {
     // every 2 bytes represent radiometric flux of one pixel
     // buffer is in row major format
 
-    auto frames_buffer1 = vector<vector< uint8_t >>();
-    auto frames_buffer2 = vector<vector< uint8_t >>();
+    auto HT_frames_b1 = vector<vector< uint8_t >>();
+    auto HT_frames_b2 = vector<vector< uint8_t >>();
 
-    auto handler_a = handlerA(frames_buffer1);
+    auto handler_a = handlerA(HT_frames_b1);
     grabber->bindBufferHandler(handler_a);
 
-    auto handler_b = handlerB(frames_buffer2);
+    auto handler_b = handlerB(HT_frames_b2);
     grabber2->bindBufferHandler(handler_b);
-    */
+
     using namespace this_thread; // sleep_for, sleep_until
     using namespace chrono; // nanoseconds, system_clock, seconds
-
+    /*
     struct Frame {
         Frame(const void *pVoid, double d, int i, int w, int h, short bpp,
               int sib) : ts(d), data_size(i),
@@ -151,6 +152,10 @@ int main() {
             assert(frame_data != nullptr);
             memcpy(frame_data, pVoid, w*h*bytes_per_pixel);
         }
+
+        //~Frame(){
+        //    delete this->frame_data;
+        //}
 
         void* frame_data = NULL;
         double ts = -1;
@@ -162,7 +167,16 @@ int main() {
 
     };
 
-    //std::map<int, std::vector<Frame>> frames;
+    rs2::context ctx;
+
+    std::vector<rs2::pipeline> pipelines;
+
+    std::vector<std::string> serials;
+
+    auto devs = ctx.query_devices();
+    for (auto&& dev : devs)
+        serials.push_back(dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+
     std::map<int, std::vector<Frame>> frames;
     std::mutex mutex;
     auto callback = [&](const rs2::frame& frame)
@@ -186,176 +200,199 @@ int main() {
         //}
     };
 
+    std::map<int, std::vector<Frame>> frames2;
+    std::mutex mutex2;
+    auto callback2 = [&](const rs2::frame& frame)
+    {
+        //std::lock_guard<std::mutex> lock(mutex);
+        if (rs2::frameset fs = frame.as<rs2::frameset>()) {
+            //rs2::disparity_transform disparity2depth(false);
+            //fs = fs.apply_filter(disparity2depth);
+            // With callbacks, all synchronized stream will arrive in a single frameset
+            for (const rs2::frame f : fs) {
+                auto vf = f.as<rs2::video_frame>();
+                Frame my_f = Frame(vf.get_data(), vf.get_timestamp(),
+                                   vf.get_data_size(), vf.get_width(),
+                                   vf.get_height(), vf.get_bytes_per_pixel(),
+                                   vf.get_stride_in_bytes());
+                frames2[f.get_profile().unique_id()].push_back(my_f);
+            }
+        } //else {
+        // Stream that bypass synchronization (such as IMU) will produce single frames
+        //frames_bypass.push_back(frame);
+        //}
+    };
 
-    rs2::pipeline pipe;
-    rs2::pipeline_profile profiles = pipe.start(callback);
-    /*
-    bool start_statusA = grabber->start();
-    cout << "CamA started succefully : " << start_statusA << endl;
-    bool start_statusB = grabber2->start();
-    cout << "CamB started succefully : " << start_statusB << std::endl;
+
+    rs2::pipeline pipe(ctx);
+    rs2::config cfg;
+    cfg.enable_device(serials[0]);
+    rs2::pipeline_profile profiles = pipe.start(cfg, callback);
+    pipelines.emplace_back(pipe);
+
+    rs2::pipeline pipe2(ctx);
+    rs2::pipeline_profile profiles2;
+    if(serials.size() > 1) {
+        rs2::config cfg2;
+        cfg2.enable_device(serials[1]);
+        profiles2 = pipe2.start(cfg2, callback2);
+        pipelines.emplace_back(pipe2);
+    }
     */
+
+    bool start_statusA = grabber->start();
+    //cout << "CamA started succefully : " << start_statusA << endl;
+    bool start_statusB = grabber2->start();
+    //cout << "CamB started succefully : " << start_statusB << std::endl;
+    /*
     // Collect the enabled streams names
     std::map<int, std::string> stream_names;
+    std::map<std::string, int> stream_numbers;
     for (auto p : profiles.get_streams()) {
         stream_names[p.unique_id()] = p.stream_name();
-        cout << p.fps() << endl;
+        stream_numbers[p.stream_name()] =  p.unique_id();
     }
 
+    std::map<int, std::string> stream_names2;
+    std::map<std::string, int> stream_numbers2;
+    if(serials.size() > 1){
+        for (auto p: profiles2.get_streams()) {
+            stream_names2[p.unique_id()] = p.stream_name();
+            stream_numbers2[p.stream_name()] = p.unique_id();
+        }
+    }
+    */
     sleep_for(nanoseconds(10000000000));
 
 
-    /*
+
     bool finish_statusA = grabber->stop();
-    cout << "CamA stoped succefully : " << finish_statusA << endl;
+    //cout << "CamA stoped succefully : " << finish_statusA << endl;
     bool finish_statusB = grabber2->stop();
-    cout << "CamB stoped succefully : " << finish_statusB << endl;
-    */
+    //cout << "CamB stoped succefully : " << finish_statusB << endl;
+    /*
     pipe.stop();
+    if(serials.size() > 1)
+        pipe2.stop();
 
     //std::vector<Frame> depth_frames = frames[0];
     //Frame depth_frame0 = depth_frames[0];
-
-    std::vector<Frame> rgb_frames = frames[3];
-    Frame color_frame = rgb_frames[237];
-
-    uint8_t* ptr = (uint8_t*)color_frame.frame_data;
-    int stride = color_frame.stride_in_bytes;
-
-    int i2 = 100, j2 = 100; // fetch pixel 100,100
-
-    cout << "  R= " << int(ptr[i2 * stride + (3*j2)    ]);
-    cout << ", G= " << int(ptr[i2 * stride + (3*j2) + 1]);
-    cout << ", B= " << int(ptr[i2 * stride + (3*j2) + 2]);
-    cout << endl;
-
-    std::stringstream png_file2;
-
-    int crows = color_frame.height; //720
-    int ccols = color_frame.width; // 1280
-
-    png_file2 << "./" << "Color" << ".png";
-    stbi_write_png(png_file2.str().c_str(), color_frame.width,
-                   color_frame.height, color_frame.bytes_per_pixel,
-                   color_frame.frame_data, color_frame.stride_in_bytes);
-
-    std::vector<Frame> depth_frames = frames[0];
-    Frame depth_frame = depth_frames[237];
+    std::vector<Frame> rgb_frames = frames[stream_numbers["Color"]];
+    std::vector<Frame> depth_frames = frames[stream_numbers["Depth"]];
 
 
-    int bpp = depth_frame.bytes_per_pixel;
-    int sib = depth_frame.stride_in_bytes;
-    int rows = depth_frame.height; //720
-    int cols = depth_frame.width; // 1280
-    uint16_t* d = (uint16_t*)depth_frame.frame_data;
-    vector<int> values(d, d + (rows*cols*bpp/sizeof(uint16_t)));
-    cout << "\nMin Element = "
-         << *min_element(values.begin(), values.end());
+    std::vector<Frame> rgb_frames2 = frames2[stream_numbers2["Color"]];
+    std::vector<Frame> depth_frames2 = frames2[stream_numbers2["Depth"]];
 
-    // Find the max element
-    cout << "\nMax Element = "
-         << *max_element(values.begin(), values.end());
+    int frames_n = rgb_frames.size();
+    std::stringstream color_png_file;
+    std::stringstream depth_png_file;
+    for (int i = 0; i < frames_n; ++i) {
+        Frame cur_color_frame = rgb_frames[i];
+        string color_frame_name = "./Color_" + to_string(i);
+        ofstream fout;
+        fout.open(color_frame_name, ios::binary | ios::out);
+        fout.write((char*)cur_color_frame.frame_data,
+                   cur_color_frame.data_size);
+        fout.close();
+        delete cur_color_frame.frame_data;
 
-    cout << "\navg Element = "
-         << avg(values);
+        Frame cur_depth_frame = depth_frames[i];
+        string depth_frame_name = "./Depth_" + to_string(i);
+        //auto start = high_resolution_clock::now();
+        fout.open(depth_frame_name, ios::binary | ios::out);
+        fout.write((char*)cur_depth_frame.frame_data,
+                   cur_depth_frame.data_size);
+        fout.close();
+        delete cur_depth_frame.frame_data;
 
-    cout << endl;
+    }
+     */
 
-
-    uint8_t* dd =  new uint8_t[rows*cols];
-
-    for(int i = 0; i < rows; i++) {
-        for(int j = 0; j < cols; j++) {
-            dd[i*cols+j] = (uint8_t)round(d[i*cols+j] / 256);
+    int H1_b_size = HT_frames_b1.size();
+    for (int i = 0; i < H1_b_size; ++i) {
+        ofstream camA_stream("H1_"+ to_string(i) +".dat", ios::out | ios::binary);
+        if(!camA_stream) {
+            cout << "Cannot open file!" << endl;
+            return 1;
+        }
+        camA_stream.write((const char *)HT_frames_b1[i].data(),
+                          sizeof(const char) * HT_frames_b1[i].size());
+        camA_stream.close();
+        if(!camA_stream.good()) {
+            cout << "Error occurred at writing time!" << endl;
+            return 1;
         }
     }
 
-    vector<int> normilized_values(dd, dd + (rows*cols));
-    cout << "\nMin Element = "
-         << *min_element(normilized_values.begin(), normilized_values.end());
+    int H2_b_size = HT_frames_b2.size();
+    for (int i = 0; i < H2_b_size; ++i) {
+        ofstream camB_stream("H2_"+ to_string(i) +".dat", ios::out | ios::binary);
+        if(!camB_stream) {
+            cout << "Cannot open file!" << endl;
+            return 1;
+        }
 
-    // Find the max element
-    cout << "\nMax Element = "
-         << *max_element(normilized_values.begin(), normilized_values.end());
+        camB_stream.write((const char *)HT_frames_b2[i].data(),
+                          sizeof(const char) * HT_frames_b2[i].size());
 
-    cout << "\navg Element = "
-         << avg(normilized_values);
-
-    cout << endl;
-
-
-    std::stringstream png_file;
-    png_file << "./" << "Depth" << ".png";
-    stbi_write_png(png_file.str().c_str(), depth_frame.width,
-                   depth_frame.height, depth_frame.bytes_per_pixel,
-                   depth_frame.frame_data, depth_frame.stride_in_bytes);
-
-    cv::Mat img_in(rows, cols, CV_16UC1, (void*)d);
-    // Show the result:
-    cv::imshow("image", img_in);
-
-    cv::Mat img2_in(rows, cols, CV_8UC1, (void*)dd);
-    cv::Mat dst;
-    equalizeHist( img2_in, dst );
-    cv::Mat img2_color;
-    // Apply the colormap:
-    cv::applyColorMap(dst, img2_color, cv::COLORMAP_JET);
-    // Show the result:
-    cv::imshow("heatmap", img2_color);
-    cv::waitKey(0);
-    cv::destroyAllWindows();
-
-
-    vector<int> compression_params;
-    compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
-    compression_params.push_back(9);
-    bool result = false;
-    try
-    {
-        result = imwrite("alpha.png", img_in, compression_params);
+        camB_stream.close();
+        if(!camB_stream.good()) {
+            cout << "Error occurred at writing time!" << endl;
+            return 1;
+        }
     }
-    catch (const cv::Exception& ex)
-    {
-        fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
-    }
-    if (result)
-        printf("Saved PNG file with alpha data.\n");
-    else
-        printf("ERROR: Can't save PNG file.\n");
 
-    //delete d3;
-
+    //save pairs for illustration
     /*
-    ofstream camA_stream("camA.dat", ios::out | ios::binary);
-    if(!camA_stream) {
-        cout << "Cannot open file!" << endl;
-        return 1;
-    }
-    camA_stream.write((const char *)frames_buffer1[0].data(),
-                      sizeof(const char) * frames_buffer1[0].size());
+    int min_size = H1_b_size < H2_b_size ? H1_b_size : H2_b_size;
+    int rows = 512;
+    int cols = 640;
+    for (int i = 0; i < min_size; ++i) {
+        uint16_t* d1 = (uint16_t*)(HT_frames_b1[i].data());
+        uint8_t* dd1 =  new uint8_t[rows*cols];
 
-    camA_stream.close();
-    if(!camA_stream.good()) {
-        cout << "Error occurred at writing time!" << endl;
-        return 1;
-    }
+        uint16_t* d2 = (uint16_t*)HT_frames_b2[i].data();
+        uint8_t* dd2 =  new uint8_t[rows*cols];
 
-    ofstream camB_stream("camB.dat", ios::out | ios::binary);
-    if(!camB_stream) {
-        cout << "Cannot open file!" << endl;
-        return 1;
-    }
+        for(int i = 0; i < rows; i++) {
+            for(int j = 0; j < cols; j++) {
+                dd1[i*cols+j] = (uint8_t)round(d1[i*cols+j] / 256);
+                dd2[i*cols+j] = (uint8_t)round(d2[i*cols+j] / 256);
+            }
+        }
+        cv::Mat HM;
+        cv::Mat H1_cv(rows, cols, CV_8UC1, dd1);
+        cv::Mat H2_cv(rows, cols, CV_8UC1, dd2);
+        hconcat(H1_cv, H2_cv, HM);
+        cv::Mat dst;
+        equalizeHist( HM, dst );
+        //cv::imshow("image", dst);
+        //cv::waitKey(0);
+        //cv::destroyAllWindows();
 
-    camB_stream.write((const char *)frames_buffer2[0].data(),
-                      sizeof(const char) * frames_buffer2[0].size());
 
-    camB_stream.close();
-    if(!camB_stream.good()) {
-        cout << "Error occurred at writing time!" << endl;
-        return 1;
+
+        vector<int> compression_params;
+        compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
+        compression_params.push_back(9);
+        bool result = false;
+        try
+        {
+            result = imwrite("pair_"+ to_string(i)+".png", dst, compression_params);
+        }
+        catch (const cv::Exception& ex)
+        {
+            fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
+        }
+        if (result)
+            printf("Saved PNG file with alpha data.\n");
+        else
+            printf("ERROR: Can't save PNG file.\n");
+
+        delete dd1;
+        delete dd2;
+
     }
     */
-
-
-
 }
