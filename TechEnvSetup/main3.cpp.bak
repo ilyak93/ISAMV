@@ -11,8 +11,6 @@
 #include <thread>
 #include <mutex>
 #include <map>
-#include <cmath>
-#include <limits>
 
 #include<iostream>
 #include<fstream>
@@ -23,51 +21,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 
-
 using namespace std;
-using namespace this_thread; // sleep_for, sleep_until
-using namespace chrono; // nanoseconds, system_clock, seconds
-
-struct Frame {
-    Frame(const void *pVoid, double ts, int data_sz, int w, int h, short bpp,
-          int sib, long long int local_ts) : ts(ts), data_size(data_sz),
-                                             width(w), height(h), bytes_per_pixel(bpp),
-                                             stride_in_bytes(sib), loc_ts(local_ts){
-        frame_data = new uint8_t[w*h*bytes_per_pixel];
-        assert(frame_data != nullptr);
-        memcpy(frame_data, pVoid, w*h*bytes_per_pixel);
-    }
-
-    //~Frame(){
-    //    delete this->frame_data;
-    //}
-
-    void* frame_data = NULL;
-    double ts = -1;
-    int data_size = -1;
-    int width = -1;
-    int height = -1;
-    short bytes_per_pixel = -1;
-    int stride_in_bytes = -1;
-    long long int loc_ts = -1;
-
-};
-
-vector<int> find_closest_by_ts(vector<long long int> TC_ts, std::vector<Frame> rs_frames) {
-    vector<int> closest_to_TC(TC_ts.size());
-    for (int i = 0; i < TC_ts.size(); ++i) {
-        long long int dist = LLONG_MAX;
-        for (int j = 0; j < rs_frames.size(); ++j) {
-            int tmp = abs(TC_ts[i] - rs_frames[j].loc_ts);
-            if(abs(TC_ts[i] - rs_frames[j].loc_ts) < dist){
-                dist = abs(TC_ts[i] - rs_frames[j].loc_ts);
-                closest_to_TC[i] = j;
-            }
-        }
-    }
-
-    return closest_to_TC;
-}
 
 double avg ( std::vector<int>& v )
 {
@@ -82,48 +36,33 @@ double avg ( std::vector<int>& v )
     return ( return_value / n);
 }
 
-class handlerA {
+class handlerA
+{
 private:
-    vector<vector<uint8_t>> &frames_conteiner;
-    vector<long long int> &local_ts;
+    vector<vector< uint8_t >> &frames_conteiner;
 public:
     const void operator() (const vector< uint8_t > &cur_frame)  {
-        const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-        long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                now.time_since_epoch()).count();
         this->frames_conteiner.push_back(cur_frame);
-        this->local_ts.push_back(loc_ts);
     }
 
-    handlerA(vector<vector<uint8_t>> &framesConteiner,
-             vector<long long int> &local_timestamps) :
-             frames_conteiner(framesConteiner), local_ts(local_timestamps) {}
+    handlerA(vector<vector<uint8_t>> &framesConteiner) : frames_conteiner(framesConteiner) {}
 };
 
 class handlerB {
 private:
-    vector<vector<uint8_t>> &frames_conteiner;
-    vector<long long int> &local_ts;
+    vector<vector< uint8_t >> &frames_conteiner;
 public:
     const void operator() (const vector< uint8_t > &cur_frame)  {
-        const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-        long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                now.time_since_epoch()).count();
         this->frames_conteiner.push_back(cur_frame);
-        this->local_ts.push_back(loc_ts);
     }
 
-    handlerB(vector<vector<uint8_t>> &framesConteiner,
-             vector<long long int> &local_timestamps) :
-            frames_conteiner(framesConteiner), local_ts(local_timestamps) {}
+    handlerB(vector<vector<uint8_t>> &framesConteiner) : frames_conteiner(framesConteiner) {}
 };
-
-
 
 int main() {
 
 
-    auto serialNumber = "070A1912";
+    auto serialNumber = "";
     auto wic = wic::findAndConnect(serialNumber);
 
 
@@ -139,7 +78,7 @@ int main() {
         return 2;
     }
 
-    auto serialNumber2 = "069A1912";
+    auto serialNumber2 = "";
     auto wic2 = wic::findAndConnect(serialNumber2);
 
     if (!wic2) {
@@ -153,8 +92,6 @@ int main() {
                   << wic::responseStatusToStr(defaultRes2.first) << endl;
         return 2;
     }
-
-
 
     // enable advanced features
     wic->iKnowWhatImDoing();
@@ -196,21 +133,39 @@ int main() {
 
     auto HT_frames_b1 = vector<vector< uint8_t >>();
     auto HT_frames_b2 = vector<vector< uint8_t >>();
-    auto HT_frames_b1_ts = vector<long long int>();
-    auto HT_frames_b2_ts = vector<long long int>();
 
-    auto handler_a = handlerA(HT_frames_b1, HT_frames_b1_ts);
+    auto handler_a = handlerA(HT_frames_b1);
     grabber->bindBufferHandler(handler_a);
 
-    auto handler_b = handlerB(HT_frames_b2, HT_frames_b2_ts);
+    auto handler_b = handlerB(HT_frames_b2);
     grabber2->bindBufferHandler(handler_b);
 
+    using namespace this_thread; // sleep_for, sleep_until
+    using namespace chrono; // nanoseconds, system_clock, seconds
+    /*
+    struct Frame {
+        Frame(const void *pVoid, double d, int i, int w, int h, short bpp,
+              int sib) : ts(d), data_size(i),
+                         width(w), height(h), bytes_per_pixel(bpp),
+                         stride_in_bytes(sib){
+            frame_data = new uint8_t[w*h*bytes_per_pixel];
+            assert(frame_data != nullptr);
+            memcpy(frame_data, pVoid, w*h*bytes_per_pixel);
+        }
 
+        //~Frame(){
+        //    delete this->frame_data;
+        //}
 
+        void* frame_data = NULL;
+        double ts = -1;
+        int data_size = -1;
+        int width = -1;
+        int height = -1;
+        short bytes_per_pixel = -1;
+        int stride_in_bytes = -1;
 
-
-
-
+    };
 
     rs2::context ctx;
 
@@ -231,19 +186,12 @@ int main() {
             //rs2::disparity_transform disparity2depth(false);
             //fs = fs.apply_filter(disparity2depth);
             // With callbacks, all synchronized stream will arrive in a single frameset
-            const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-            long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    now.time_since_epoch()).count();
             for (const rs2::frame f : fs) {
                 auto vf = f.as<rs2::video_frame>();
                 Frame my_f = Frame(vf.get_data(), vf.get_timestamp(),
                                    vf.get_data_size(), vf.get_width(),
                                    vf.get_height(), vf.get_bytes_per_pixel(),
-                                   vf.get_stride_in_bytes(), loc_ts);
-
-
-                double d = vf.get_timestamp();
-
+                                   vf.get_stride_in_bytes());
                 frames[f.get_profile().unique_id()].push_back(my_f);
             }
         } //else {
@@ -263,13 +211,10 @@ int main() {
             // With callbacks, all synchronized stream will arrive in a single frameset
             for (const rs2::frame f : fs) {
                 auto vf = f.as<rs2::video_frame>();
-                const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-                long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                        now.time_since_epoch()).count();
                 Frame my_f = Frame(vf.get_data(), vf.get_timestamp(),
                                    vf.get_data_size(), vf.get_width(),
                                    vf.get_height(), vf.get_bytes_per_pixel(),
-                                   vf.get_stride_in_bytes(), loc_ts);
+                                   vf.get_stride_in_bytes());
                 frames2[f.get_profile().unique_id()].push_back(my_f);
             }
         } //else {
@@ -278,46 +223,28 @@ int main() {
         //}
     };
 
-    vector<vector< uint8_t >> TC_frames1;
-    vector<uint64_t> TC_frames1_ts;
-
-    auto TC_callback = [&](const vector< uint8_t > & frame) {
-        TC_frames1.push_back(frame);
-        const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-        //auto n =  std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
-        //TC_frames1_ts.push_back(n);
-    };
-
 
     rs2::pipeline pipe(ctx);
     rs2::config cfg;
     cfg.enable_device(serials[0]);
-    //cfg.enable_stream(RS2_STREAM_ANY, 1280, 720, RS2_FORMAT_ANY, 30);
-
-
-
     rs2::pipeline_profile profiles = pipe.start(cfg, callback);
-
-    bool start_statusA = grabber->start();
-    //cout << "CamA started succefully : " << start_statusA << endl;
-    bool start_statusB = grabber2->start();
-    //cout << "CamB started succefully : " << start_statusB << std::endl;
-
     pipelines.emplace_back(pipe);
 
     rs2::pipeline pipe2(ctx);
     rs2::pipeline_profile profiles2;
     if(serials.size() > 1) {
         rs2::config cfg2;
-        //cfg2.enable_stream(RS2_STREAM_ANY, 1280, 720, RS2_FORMAT_ANY, 30);
         cfg2.enable_device(serials[1]);
         profiles2 = pipe2.start(cfg2, callback2);
         pipelines.emplace_back(pipe2);
     }
+    */
 
-
-
-
+    bool start_statusA = grabber->start();
+    //cout << "CamA started succefully : " << start_statusA << endl;
+    bool start_statusB = grabber2->start();
+    //cout << "CamB started succefully : " << start_statusB << std::endl;
+    /*
     // Collect the enabled streams names
     std::map<int, std::string> stream_names;
     std::map<std::string, int> stream_numbers;
@@ -334,8 +261,8 @@ int main() {
             stream_numbers2[p.stream_name()] = p.unique_id();
         }
     }
-
-    sleep_for(nanoseconds(100000000000));
+    */
+    sleep_for(nanoseconds(10000000000));
 
 
 
@@ -343,50 +270,25 @@ int main() {
     //cout << "CamA stoped succefully : " << finish_statusA << endl;
     bool finish_statusB = grabber2->stop();
     //cout << "CamB stoped succefully : " << finish_statusB << endl;
-
+    /*
     pipe.stop();
     if(serials.size() > 1)
         pipe2.stop();
-    cout << "Cams Stopped: " << endl;
+
     //std::vector<Frame> depth_frames = frames[0];
     //Frame depth_frame0 = depth_frames[0];
     std::vector<Frame> rgb_frames = frames[stream_numbers["Color"]];
     std::vector<Frame> depth_frames = frames[stream_numbers["Depth"]];
 
-    for (int i = 0; i < rgb_frames.size()-1; ++i) {
-        assert(rgb_frames[i].loc_ts <= rgb_frames[i+1].loc_ts);
-    }
 
-    for (int i = 0; i < depth_frames.size()-1; ++i) {
-        assert(depth_frames[i].loc_ts <= depth_frames[i+1].loc_ts);
-    }
-
-    for (int i = 0; i < HT_frames_b1_ts.size()-1; ++i) {
-        assert(HT_frames_b1_ts[i] <= HT_frames_b1_ts[i+1]);;
-    }
-
-    for (int i = 0; i < HT_frames_b2_ts.size()-1; ++i) {
-        assert(HT_frames_b2_ts[i] <= HT_frames_b2_ts[i+1]);
-    }
-
-
-    //std::vector<Frame> rgb_frames2 = frames2[stream_numbers2["Color"]];
-    //std::vector<Frame> depth_frames2 = frames2[stream_numbers2["Depth"]];
+    std::vector<Frame> rgb_frames2 = frames2[stream_numbers2["Color"]];
+    std::vector<Frame> depth_frames2 = frames2[stream_numbers2["Depth"]];
 
     int frames_n = rgb_frames.size();
     std::stringstream color_png_file;
     std::stringstream depth_png_file;
     for (int i = 0; i < frames_n; ++i) {
-        /*
         Frame cur_color_frame = rgb_frames[i];
-
-        std::stringstream png_file;
-        png_file << "./" << "Color_" + to_string(i) + ".png";
-        stbi_write_png(png_file.str().c_str(), cur_color_frame.width,
-                       cur_color_frame.height, cur_color_frame.bytes_per_pixel,
-                       cur_color_frame.frame_data, cur_color_frame.stride_in_bytes);
-        */
-        /*
         string color_frame_name = "./Color_" + to_string(i);
         ofstream fout;
         fout.open(color_frame_name, ios::binary | ios::out);
@@ -403,13 +305,12 @@ int main() {
                    cur_depth_frame.data_size);
         fout.close();
         delete cur_depth_frame.frame_data;
-        */
-    }
 
+    }
+     */
 
     int H1_b_size = HT_frames_b1.size();
     for (int i = 0; i < H1_b_size; ++i) {
-        /*
         ofstream camA_stream("H1_"+ to_string(i) +".dat", ios::out | ios::binary);
         if(!camA_stream) {
             cout << "Cannot open file!" << endl;
@@ -422,12 +323,10 @@ int main() {
             cout << "Error occurred at writing time!" << endl;
             return 1;
         }
-         */
     }
 
     int H2_b_size = HT_frames_b2.size();
     for (int i = 0; i < H2_b_size; ++i) {
-        /*
         ofstream camB_stream("H2_"+ to_string(i) +".dat", ios::out | ios::binary);
         if(!camB_stream) {
             cout << "Cannot open file!" << endl;
@@ -442,16 +341,13 @@ int main() {
             cout << "Error occurred at writing time!" << endl;
             return 1;
         }
-        */
     }
 
-
     //save pairs for illustration
-
+    /*
     int min_size = H1_b_size < H2_b_size ? H1_b_size : H2_b_size;
     int rows = 512;
     int cols = 640;
-    vector<int> closest_indices = find_closest_by_ts(HT_frames_b1_ts, rgb_frames);
     for (int i = 0; i < min_size; ++i) {
         uint16_t* d1 = (uint16_t*)(HT_frames_b1[i].data());
         uint8_t* dd1 =  new uint8_t[rows*cols];
@@ -465,24 +361,17 @@ int main() {
                 dd2[i*cols+j] = (uint8_t)round(d2[i*cols+j] / 256);
             }
         }
-
+        cv::Mat HM;
         cv::Mat H1_cv(rows, cols, CV_8UC1, dd1);
         cv::Mat H2_cv(rows, cols, CV_8UC1, dd2);
-        cv::Mat closest_rgb(720, 1280, CV_8UC3, rgb_frames[closest_indices[i]].frame_data);
-        cv::Mat closest_gray;
-        cv::cvtColor(closest_rgb, closest_gray, cv::COLOR_RGB2GRAY);
-        cv::Mat HM;
-        hconcat(H1_cv, H2_cv,HM);
+        hconcat(H1_cv, H2_cv, HM);
         cv::Mat dst;
-        equalizeHist( HM, HM );
-        HM.resize(720, 0);
-        cv::Mat TC_e_color;
-        hconcat(HM,closest_gray, TC_e_color);
-
-
+        equalizeHist( HM, dst );
         //cv::imshow("image", dst);
         //cv::waitKey(0);
         //cv::destroyAllWindows();
+
+
 
         vector<int> compression_params;
         compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
@@ -490,7 +379,7 @@ int main() {
         bool result = false;
         try
         {
-            result = imwrite("pair_"+ to_string(i)+".png", TC_e_color, compression_params);
+            result = imwrite("pair_"+ to_string(i)+".png", dst, compression_params);
         }
         catch (const cv::Exception& ex)
         {
@@ -501,9 +390,9 @@ int main() {
         else
             printf("ERROR: Can't save PNG file.\n");
 
-        //delete dd1;
-        //delete dd2;
+        delete dd1;
+        delete dd2;
 
     }
-
+    */
 }
