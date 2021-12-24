@@ -335,7 +335,7 @@ int main() {
         }
     }
 
-    sleep_for(nanoseconds(100000000000));
+    sleep_for(nanoseconds(10000000000));
 
 
 
@@ -453,32 +453,51 @@ int main() {
     int cols = 640;
     vector<int> closest_indices = find_closest_by_ts(HT_frames_b1_ts, rgb_frames);
     for (int i = 0; i < min_size; ++i) {
-        uint16_t* d1 = (uint16_t*)(HT_frames_b1[i].data());
-        uint8_t* dd1 =  new uint8_t[rows*cols];
+        uint16_t* tc1_data_p = (uint16_t*)(HT_frames_b1[i].data());
+        uint16_t* tc2_data_p = (uint16_t*)HT_frames_b2[i].data();
 
-        uint16_t* d2 = (uint16_t*)HT_frames_b2[i].data();
-        uint8_t* dd2 =  new uint8_t[rows*cols];
+        cv::Mat tc1_img(rows, cols, CV_16UC1, (void*)tc1_data_p);
+        cv::Mat tc1_img8u;
+        tc1_img.convertTo(tc1_img8u, CV_8UC1, 1/256.0);
 
-        for(int i = 0; i < rows; i++) {
-            for(int j = 0; j < cols; j++) {
-                dd1[i*cols+j] = (uint8_t)round(d1[i*cols+j] / 256);
-                dd2[i*cols+j] = (uint8_t)round(d2[i*cols+j] / 256);
-            }
-        }
+        cv::Mat tc2_img(rows, cols, CV_16UC1, (void*)tc2_data_p);
+        cv::Mat tc2_img8u;
+        tc2_img.convertTo(tc2_img8u, CV_8UC1, 1/256.0);
 
-        cv::Mat H1_cv(rows, cols, CV_8UC1, dd1);
-        cv::Mat H2_cv(rows, cols, CV_8UC1, dd2);
-        cv::Mat closest_rgb(720, 1280, CV_8UC3, rgb_frames[closest_indices[i]].frame_data);
+
+        //equalized depth image creation
+        uint16_t* dep1 = (uint16_t*)depth_frames[closest_indices[i]].frame_data;
+        cv::Mat depth_img(720, 1280, CV_16UC1, (void*)dep1);
+        //normalize(depth_img, depth_img, 0, 65535, cv::NORM_MINMAX);
+        cv::Mat depth_img8u;
+        depth_img.convertTo(depth_img8u, CV_8UC1, 1/256.0);
+
+        cv::Mat eq_depth_img;
+        equalizeHist( depth_img8u, eq_depth_img );
+        // Apply the colormap:
+        //cv::Mat eq_depth_img8u_heatmap;
+        //cv::applyColorMap(eq_depth_img, eq_depth_img8u_heatmap, cv::COLORMAP_JET);
+
+        cv::Mat closest_rgb(720, 1280, CV_8UC3,
+                            rgb_frames[closest_indices[i]].frame_data);
         cv::Mat closest_gray;
         cv::cvtColor(closest_rgb, closest_gray, cv::COLOR_RGB2GRAY);
         cv::Mat HM;
-        hconcat(H1_cv, H2_cv,HM);
-        cv::Mat dst;
+
+        //tc1_img8u.resize(719, 0);
+        //tc2_img8u.resize(719, 0);
+        //tc1_img8u.resize(720, 255);
+        //tc2_img8u.resize(720, 255);
+        //normalize(tc1_img8u, tc1_img8u, 0, 65535, cv::NORM_MINMAX);
+        //normalize(tc2_img8u, tc2_img8u, 0, 65535, cv::NORM_MINMAX);
+        hconcat(tc1_img8u, tc2_img8u,HM);
         equalizeHist( HM, HM );
         HM.resize(720, 0);
+
         cv::Mat TC_e_color;
         hconcat(HM,closest_gray, TC_e_color);
-
+        cv::Mat TC_e_color_e_depth;
+        hconcat(TC_e_color, eq_depth_img, TC_e_color_e_depth);
 
         //cv::imshow("image", dst);
         //cv::waitKey(0);
@@ -490,20 +509,16 @@ int main() {
         bool result = false;
         try
         {
-            result = imwrite("pair_"+ to_string(i)+".png", TC_e_color, compression_params);
+            result = imwrite("pair_"+ to_string(i)+".png", TC_e_color_e_depth, compression_params);
         }
         catch (const cv::Exception& ex)
         {
             fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
         }
-        if (result)
-            printf("Saved PNG file with alpha data.\n");
-        else
+        if (!result)
             printf("ERROR: Can't save PNG file.\n");
 
-        //delete dd1;
-        //delete dd2;
-
     }
+    cout << "Finished" << endl;
 
 }
