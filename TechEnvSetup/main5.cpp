@@ -36,91 +36,6 @@ using namespace boost::iostreams;
 using namespace boost::interprocess;
 
 
-
-
-/*
-struct Frame {
-    Frame(const void *pVoid, double ts, int data_sz, int w, int h, short bpp,
-          int sib, long long int local_ts) : ts(ts), data_size(data_sz),
-                                             width(w), height(h), bytes_per_pixel(bpp),
-                                             stride_in_bytes(sib), loc_ts(local_ts){
-        frame_data = new uint8_t[w*h*bytes_per_pixel];
-        assert(frame_data != nullptr);
-        memcpy(frame_data, pVoid, w*h*bytes_per_pixel);
-    }
-
-    //~Frame(){
-    //    delete this->frame_data;
-    //}
-
-    void* frame_data = NULL;
-    double ts = -1;
-    int data_size = -1;
-    int width = -1;
-    int height = -1;
-    short bytes_per_pixel = -1;
-    int stride_in_bytes = -1;
-    long long int loc_ts = -1;
-
-};
-
-
-vector<int> find_closest_by_ts(vector<long long int> TC_ts, std::vector<Frame> rs_frames) {
-    vector<int> closest_to_TC(TC_ts.size());
-    for (int i = 0; i < TC_ts.size(); ++i) {
-        long long int dist = LLONG_MAX;
-        for (int j = 0; j < rs_frames.size(); ++j) {
-            __int64 tmp = abs(TC_ts[i] - rs_frames[j].loc_ts);
-            if(abs(TC_ts[i] - rs_frames[j].loc_ts) < dist){
-                dist = abs(TC_ts[i] - rs_frames[j].loc_ts);
-                closest_to_TC[i] = j;
-            }
-        }
-    }
-
-    return closest_to_TC;
-}
-*/
-/*
-class handlerA {
-private:
-    vector<vector<uint8_t>> &frames_conteiner;
-    vector<long long int> &local_ts;
-public:
-    const void operator() (const vector< uint8_t > &cur_frame)  {
-        const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-        long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                now.time_since_epoch()).count();
-        this->frames_conteiner.push_back(cur_frame);
-        this->local_ts.push_back(loc_ts);
-    }
-
-    handlerA(vector<vector<uint8_t>> &framesConteiner,
-             vector<long long int> &local_timestamps) :
-             frames_conteiner(framesConteiner), local_ts(local_timestamps) {}
-};
-
-class handlerB {
-private:
-    vector<vector<uint8_t>> &frames_conteiner;
-    vector<long long int> &local_ts;
-public:
-    const void operator() (const vector< uint8_t > &cur_frame)  {
-        const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-        long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                now.time_since_epoch()).count();
-        this->frames_conteiner.push_back(cur_frame);
-        this->local_ts.push_back(loc_ts);
-    }
-
-    handlerB(vector<vector<uint8_t>> &framesConteiner,
-             vector<long long int> &local_timestamps) :
-            frames_conteiner(framesConteiner), local_ts(local_timestamps) {}
-};
-
-*/
-
-
 class RSCallback {
 public:
     char** color_mfd_ptr = new char*;
@@ -260,18 +175,14 @@ public:
     // operator function () on objects of increment
     void operator()() {
         color_mapped_fd.close();
-        rename((save_dir + to_string(idx) + "color.bin").c_str(),
-               (save_dir + to_string(idx) + "color_f.bin").c_str());
+
         depth_mapped_fd.close();
-        rename((save_dir + to_string(idx) + "depth.bin").c_str(),
-               (save_dir + to_string(idx) + "depth_f.bin").c_str());
+
 
         tc1_mapped_fd.close();
-        rename((save_dir + to_string(idx) + "tc1.bin").c_str(),
-               (save_dir + to_string(idx) + "tc1_f.bin").c_str());
+
         tc2_mapped_fd.close();
-        rename((save_dir + to_string(idx) + "tc2.bin").c_str(),
-               (save_dir + to_string(idx) + "tc2_f.bin").c_str());
+
 
         ofstream cd_fout;
         string color_depth_ts_name = save_dir + to_string(idx) + "color_depth_ts.bin";
@@ -279,8 +190,7 @@ public:
         cd_fout.write((char *) color_depth_ts.data(),
                       color_depth_ts.size() * sizeof(long long int));
         cd_fout.close();
-        rename((save_dir + to_string(idx) + "color_depth_ts.bin").c_str(),
-               (save_dir + to_string(idx) + "color_depth_ts_f.bin").c_str());
+
 
         ofstream tc1_fout;
         string tc1_ts_name = save_dir + to_string(idx) + "tc1_ts.bin";
@@ -288,8 +198,7 @@ public:
         tc1_fout.write((char *) tc1_ts.data(),
                       tc1_ts.size() * sizeof(long long int));
         tc1_fout.close();
-        rename((save_dir + to_string(idx) + "tc1_ts.bin").c_str(),
-               (save_dir + to_string(idx) + "tc1_ts_f.bin").c_str());
+
 
         ofstream tc2_fout;
         string tc2_ts_name = save_dir + to_string(idx) + "tc2_ts.bin";
@@ -297,8 +206,7 @@ public:
         tc2_fout.write((char *) tc2_ts.data(),
                        tc2_ts.size() * sizeof(long long int));
         tc2_fout.close();
-        rename((save_dir + to_string(idx) + "tc2_ts.bin").c_str(),
-               (save_dir + to_string(idx) + "tc2_ts_f.bin").c_str());
+
     }
 };
 
@@ -374,7 +282,7 @@ int main() {
         return 3;
     }
 
-    int time_to_record = 60;
+    int time_to_record = 2;
 
     int rs_fps = 30;
     int tc_fps = 9;
@@ -508,7 +416,7 @@ int main() {
     //cout << "CamB started succefully : " << start_statusB << std::endl;
     for (int cur_idx = 0; cur_idx < number_of_records; ++cur_idx) {
 
-        while (idx_color.load() < 1750) {
+        while (idx_color.load() < 50) { //time_to_record * 30 - 10
             continue;
         }
 

@@ -121,6 +121,187 @@ public:
 */
 
 
+class RSCallback {
+public:
+    char** color_mfd_ptr = new char*;
+    char** depth_mfd_ptr = new char*;
+    vector<long long int>& color_depth_ts;
+    volatile int& idx_depth;
+    std::atomic<volatile int>& idx_color;
+    std::mutex& mux;
+    boost::shared_mutex& shared_mux;
+
+public:
+    RSCallback(char* cmfd_ptr, char* dmfd_ptr, vector<long long int>& ccdts,
+               std::atomic<volatile int>& idxc, int& idxd, std::mutex& mx,
+               boost::shared_mutex& smx) : idx_color(idxc), idx_depth(idxd),
+               color_depth_ts(ccdts), mux(mx), shared_mux(smx){
+        *color_mfd_ptr = cmfd_ptr;
+        *depth_mfd_ptr = dmfd_ptr;
+
+    }
+    // This operator overloading enables calling
+    // operator function () on objects of increment
+    void operator () (const rs2::frame &frame) {
+        boost::shared_lock<boost::shared_mutex> shared_lock(this->shared_mux);
+        std::lock_guard<std::mutex> lock(this->mux);
+        if (rs2::frameset fs = frame.as<rs2::frameset>()) {
+            //rs2::disparity_transform disparity2depth(false);
+            //fs = fs.apply_filter(disparity2depth);
+            // With callbacks, all synchronized stream will arrive in a single frameset
+            const std::chrono::time_point<std::chrono::steady_clock> now =
+                    high_resolution_clock::now();
+            long long int loc_ts =
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                            now.time_since_epoch()).count();
+            color_depth_ts.push_back(loc_ts);
+            for (const rs2::frame f: fs) {
+                auto vf = f.as<rs2::video_frame>();
+                if (vf.get_bytes_per_pixel() == 2) {
+                    size_t sz = vf.get_data_size();
+                    memcpy((void *) ((uint8_t *) (*depth_mfd_ptr) +
+                                    idx_depth * sz), vf.get_data(), sz);
+                    idx_depth++;
+                } else {
+                    size_t sz = vf.get_data_size();
++                    memcpy((void *) ((uint8_t *) (*color_mfd_ptr) +
+                                    idx_color * sz), vf.get_data(), sz);
+                    idx_color.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+        }
+    }
+};
+
+
+class TC1Callback {
+public:
+    char** tc_mfd_ptr = new char*;
+    vector<long long int> &tc_ts;
+    int& idx_tc;
+    size_t sz;
+    std::mutex &mux;
+    boost::shared_mutex &shared_mux;
+public:
+    TC1Callback(char *tcm_ptr, vector<long long int> &tcts, int& ixtc,
+                size_t tc_size, std::mutex &mx, boost::shared_mutex &smx) :
+             tc_ts(tcts), idx_tc(ixtc), sz(tc_size),
+            mux(mx), shared_mux(smx) {
+        *tc_mfd_ptr =  tcm_ptr;
+    }
+
+    // This operator overloading enables calling
+    // operator function () on objects of increment
+    void operator()(const vector <uint8_t> &cur_frame) {
+        boost::shared_lock<boost::shared_mutex> shared_lock(shared_mux);
+        std::lock_guard <std::mutex> lock(mux);
+        memcpy((void *) ((uint8_t *) (*tc_mfd_ptr) + idx_tc * sz), cur_frame.data(), sz);
+        const std::chrono::time_point <std::chrono::steady_clock> now = high_resolution_clock::now();
+        long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                now.time_since_epoch()).count();
+        tc_ts.push_back(loc_ts);
+        idx_tc++;
+    }
+};
+
+class TC2Callback {
+public:
+    char** tc_mfd_ptr = new char*;
+    vector<long long int> &tc_ts;
+    int& idx_tc;
+    size_t sz;
+    std::mutex &mux;
+    boost::shared_mutex &shared_mux;
+public:
+    TC2Callback(char *tcm_ptr, vector<long long int> &tcts, int& ixtc,
+                size_t tc_size, std::mutex &mx, boost::shared_mutex &smx) :
+            tc_ts(tcts), idx_tc(ixtc), sz(tc_size),
+            mux(mx), shared_mux(smx) {
+        *tc_mfd_ptr =  tcm_ptr;
+    }
+
+    // This operator overloading enables calling
+    // operator function () on objects of increment
+    void operator()(const vector <uint8_t> &cur_frame) {
+        boost::shared_lock<boost::shared_mutex> shared_lock(shared_mux);
+        std::lock_guard <std::mutex> lock(mux);
+        memcpy((void *) ((uint8_t *) (*tc_mfd_ptr) + idx_tc * sz), cur_frame.data(), sz);
+        const std::chrono::time_point <std::chrono::steady_clock> now = high_resolution_clock::now();
+        long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                now.time_since_epoch()).count();
+        tc_ts.push_back(loc_ts);
+        idx_tc++;
+    }
+};
+
+class SaveCallback {
+public:
+    mapped_file& color_mapped_fd;
+    mapped_file& depth_mapped_fd;
+    mapped_file& tc1_mapped_fd;
+    mapped_file& tc2_mapped_fd;
+    vector<long long int>& color_depth_ts;
+    vector<long long int>& tc1_ts;
+    vector<long long int>& tc2_ts;
+    int idx;
+    string save_dir;
+
+public:
+    SaveCallback(mapped_file& cmfd, mapped_file& dmfd, mapped_file& tc1fd,
+                 mapped_file& tc2fd, vector<long long int>& cdts,
+                 vector<long long int>& tc1ts, vector<long long int>& tc2ts,
+                 int ix, string sdir) : color_mapped_fd(cmfd), depth_mapped_fd(dmfd),
+                           tc1_mapped_fd(tc1fd), color_depth_ts(cdts),
+                           tc1_ts(tc1ts), tc2_ts(tc2ts), tc2_mapped_fd(tc2fd),
+                           idx(ix), save_dir(sdir){}
+
+
+    // This operator overloading enables calling
+    // operator function () on objects of increment
+    void operator()() {
+        color_mapped_fd.close();
+        rename((save_dir + to_string(idx) + "color.bin").c_str(),
+               (save_dir + to_string(idx) + "color_f.bin").c_str());
+        depth_mapped_fd.close();
+        rename((save_dir + to_string(idx) + "depth.bin").c_str(),
+               (save_dir + to_string(idx) + "depth_f.bin").c_str());
+
+        tc1_mapped_fd.close();
+        rename((save_dir + to_string(idx) + "tc1.bin").c_str(),
+               (save_dir + to_string(idx) + "tc1_f.bin").c_str());
+        tc2_mapped_fd.close();
+        rename((save_dir + to_string(idx) + "tc2.bin").c_str(),
+               (save_dir + to_string(idx) + "tc2_f.bin").c_str());
+
+        ofstream cd_fout;
+        string color_depth_ts_name = save_dir + to_string(idx) + "color_depth_ts.bin";
+        cd_fout.open(color_depth_ts_name, ios::binary | ios::out);
+        cd_fout.write((char *) color_depth_ts.data(),
+                      color_depth_ts.size() * sizeof(long long int));
+        cd_fout.close();
+        rename((save_dir + to_string(idx) + "color_depth_ts.bin").c_str(),
+               (save_dir + to_string(idx) + "color_depth_ts_f.bin").c_str());
+
+        ofstream tc1_fout;
+        string tc1_ts_name = save_dir + to_string(idx) + "tc1_ts.bin";
+        tc1_fout.open(tc1_ts_name, ios::binary | ios::out);
+        tc1_fout.write((char *) tc1_ts.data(),
+                      tc1_ts.size() * sizeof(long long int));
+        tc1_fout.close();
+        rename((save_dir + to_string(idx) + "tc1_ts.bin").c_str(),
+               (save_dir + to_string(idx) + "tc1_ts_f.bin").c_str());
+
+        ofstream tc2_fout;
+        string tc2_ts_name = save_dir + to_string(idx) + "tc2_ts.bin";
+        tc2_fout.open(tc2_ts_name, ios::binary | ios::out);
+        tc2_fout.write((char *) tc2_ts.data(),
+                       tc2_ts.size() * sizeof(long long int));
+        tc2_fout.close();
+        rename((save_dir + to_string(idx) + "tc2_ts.bin").c_str(),
+               (save_dir + to_string(idx) + "tc2_ts_f.bin").c_str());
+    }
+};
+
 
 int main() {
 
@@ -138,7 +319,7 @@ int main() {
     auto defaultRes = wic->doDefaultWICSettings();
     if (defaultRes.first != wic::ResponseStatus::Ok) {
         cerr << "DoDefaultWICSettings: "
-                  << wic::responseStatusToStr(defaultRes.first) << endl;
+             << wic::responseStatusToStr(defaultRes.first) << endl;
         return 2;
     }
 
@@ -153,7 +334,7 @@ int main() {
     auto defaultRes2 = wic2->doDefaultWICSettings();
     if (defaultRes2.first != wic::ResponseStatus::Ok) {
         cerr << "DoDefaultWICSettings: "
-                  << wic::responseStatusToStr(defaultRes2.first) << endl;
+             << wic::responseStatusToStr(defaultRes2.first) << endl;
         return 2;
     }
 
@@ -178,8 +359,8 @@ int main() {
     auto grabber2 = wic2->frameGrabber();
     grabber2->setup();
 
-    auto status1  = wic->setFFCMode(wic::FFCModes::Manual);
-    auto status2  = wic2->setFFCMode(wic::FFCModes::Manual);
+    auto status1 = wic->setFFCMode(wic::FFCModes::Manual);
+    auto status2 = wic2->setFFCMode(wic::FFCModes::Manual);
 
     auto resolution = wic->getResolution();
     if (resolution.first == 0 || resolution.second == 0) {
@@ -193,44 +374,48 @@ int main() {
         return 3;
     }
 
-    // default wic settings = OutputType::RAD14
-    // every 2 bytes represent radiometric flux of one pixel
-    // buffer is in row major format
+    int time_to_record = 60;
 
-    //auto HT_frames_b1 = vector<vector< uint8_t >>();
-    //auto HT_frames_b2 = vector<vector< uint8_t >>();
-    //auto t1 = high_resolution_clock::now();
+    int rs_fps = 30;
+    int tc_fps = 9;
 
-    size_t total_tc_size = 640 * 512 * 2 * 9 * 300;
+    int rgb_ch = 3;
+    int depth_px_sz = 2;
+    int tc_px_sz = 2;
+
+    size_t total_tc_size = 640 * 512 * tc_px_sz * tc_fps * time_to_record;
     size_t tc_size = 640 * 512 * 2;
 
-    long long color_size = 720LL * 1280 * 3 * 30 * 300;
-    long long depth_size = 720LL * 1280 * 2 * 30 * 300;
+    long long color_size = 720LL * 1280 * rgb_ch * rs_fps * time_to_record;
+    long long depth_size = 720LL * 1280 * depth_px_sz * rs_fps * time_to_record;
 
-
-    //auto HT_frames_b2_ts = vector<long long int>();
 
     int number_of_records = 4;
 
-    vector<vector<long long int>> HT_tss_vec(number_of_records);
+    vector <vector<long long int>> HT1_tss_vec(number_of_records);
+    vector <vector<long long int>> HT2_tss_vec(number_of_records);
 
-    vector<vector<long long int>> color_depth_tss(number_of_records);
+    vector <vector<long long int>> color_depth_tss(number_of_records);
 
-    char** tc1_mfd_ptrs = (char**) new char*[number_of_records];
-    mapped_file* tc1_mapped_fds = (mapped_file*) new mapped_file[number_of_records];
+    char **tc1_mfd_ptrs = (char **) new char *[number_of_records];
+    mapped_file * tc1_mapped_fds = (mapped_file * )
+    new mapped_file[number_of_records];
 
-    char** tc2_mfd_ptrs = (char**) new char*[number_of_records];
-    mapped_file* tc2_mapped_fds = (mapped_file*) new mapped_file[number_of_records];
+    char **tc2_mfd_ptrs = (char **) new char *[number_of_records];
+    mapped_file * tc2_mapped_fds = (mapped_file * )
+    new mapped_file[number_of_records];
 
-    char** color_mfd_ptrs = (char**) new char*[number_of_records];
-    mapped_file* color_mapped_fds = (mapped_file*) new mapped_file[number_of_records];
+    char **color_mfd_ptrs = (char **) new char *[number_of_records];
+    mapped_file * color_mapped_fds = (mapped_file * )
+    new mapped_file[number_of_records];
 
-    char** depth_mfd_ptrs = (char**) new char*[number_of_records];
-    mapped_file* depth_mapped_fds = (mapped_file*) new mapped_file[number_of_records];
+    char **depth_mfd_ptrs = (char **) new char *[number_of_records];
+    mapped_file * depth_mapped_fds = (mapped_file * )
+    new mapped_file[number_of_records];
 
     for (int l = 0; l < number_of_records; ++l) {
 
-        string tc1_file_path = save_dir + to_string(l) +  + "tc1.bin";
+        string tc1_file_path = save_dir + to_string(l) + +"tc1.bin";
         const char *tc1_FileName = tc1_file_path.c_str();
         const size_t tc1_FileSize = total_tc_size;
 
@@ -260,6 +445,7 @@ int main() {
         color_mapped_fds[l] = mapped_file(params_c);
         color_mfd_ptrs[l] = color_mapped_fds[l].data();
 
+
         string d_file_path = save_dir + to_string(l) + "depth.bin";
         const char *d_FileName = d_file_path.c_str();
         const std::size_t FileSize = depth_size;
@@ -272,105 +458,32 @@ int main() {
 
     }
 
-    int cur_idx = 0;
-
-    auto cur_tc1_mfd = tc1_mapped_fds[0];
-    auto cur_tc1_mfd_ptr = tc1_mfd_ptrs[0];
-    auto cur_HT_frames_b1_ts = HT_tss_vec[0];
-
-    auto cur_tc2_mfd = tc2_mapped_fds[0];
-    auto cur_tc2_mfd_ptr = tc2_mfd_ptrs[0];
-    //auto cur_HT_frames_b2_ts = HT_tss_vec[0];
-
-    auto cur_color_mfd = color_mapped_fds[0];
-    auto cur_color_mfd_ptr = color_mfd_ptrs[0];
-
-    auto cur_depth_mfd = depth_mapped_fds[0];
-    auto cur_depth_mfd_ptr = depth_mfd_ptrs[0];
-
-    auto cur_color_depth_ts = color_depth_tss[0];
-
     boost::shared_mutex shared_mux;
     std::mutex tc1_mutex;
     int idx_tc1 = 0;
-
-    auto tc1_callback = [&](const vector<uint8_t> &cur_frame) {
-        boost::shared_lock< boost::shared_mutex> shared_lock(shared_mux);
-        std::lock_guard<std::mutex> lock(tc1_mutex);
-        memcpy((void *) ((uint8_t *) cur_tc1_mfd_ptr + idx_tc1 * tc_size), cur_frame.data(), tc_size);
-        const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-        long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                now.time_since_epoch()).count();
-        cur_HT_frames_b1_ts.push_back(loc_ts);
-        idx_tc1++;
-
-    };
+    auto tc1_callback = TC1Callback(tc1_mfd_ptrs[0], HT1_tss_vec[0], idx_tc1,
+                                    tc_size, tc1_mutex, shared_mux);
 
 
     std::mutex tc2_mutex;
     int idx_tc2 = 0;
-    auto tc2_callback = [&](const vector<uint8_t> &cur_frame) {
-        boost::shared_lock< boost::shared_mutex> shared_lock(shared_mux);
-        std::lock_guard<std::mutex> lock(tc2_mutex);
-        memcpy((void *) ((uint8_t *) cur_tc2_mfd_ptr + idx_tc2 * tc_size), cur_frame.data(), tc_size);
-        //const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-        //long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        //now.time_since_epoch()).count();
-        //HT_frames_b2_ts.push_back(loc_ts);
-        idx_tc2++;
-    };
+    auto tc2_callback = TC2Callback(tc2_mfd_ptrs[0], HT2_tss_vec[0], idx_tc2,
+                                    tc_size, tc2_mutex, shared_mux);
 
     //auto handler_a = handlerA(HT_frames_b1, HT_frames_b1_ts);
     grabber->bindBufferHandler(tc1_callback);
 
     //auto handler_b = handlerB(HT_frames_b2, HT_frames_b2_ts);
     grabber2->bindBufferHandler(tc2_callback);
+    /*
+    auto save_callback = SaveCallback(color_mapped_fds[0], depth_mapped_fds[0],
+                                      tc1_mapped_fds[0], tc2_mapped_fds[0],
+                                      color_depth_tss[0], HT1_tss_vec[0],
+                                      HT2_tss_vec[0], 0);
 
-
-    //Define file names
-
-
-
-    volatile int idx_depth = 0;
-    std::atomic<volatile int> idx_color(0);
-
+    */
     //std::map<int, std::vector<Frame>> frames;
-    std::mutex mutex;
-
-    auto callback = [&](const rs2::frame &frame) {
-        boost::shared_lock< boost::shared_mutex> shared_lock(shared_mux);
-        std::lock_guard<std::mutex> lock(mutex);
-        if (rs2::frameset fs = frame.as<rs2::frameset>()) {
-            //rs2::disparity_transform disparity2depth(false);
-            //fs = fs.apply_filter(disparity2depth);
-            // With callbacks, all synchronized stream will arrive in a single frameset
-            const std::chrono::time_point<std::chrono::steady_clock> now = high_resolution_clock::now();
-            long long int loc_ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    now.time_since_epoch()).count();
-            cur_color_depth_ts.push_back(loc_ts);
-            for (const rs2::frame f: fs) {
-                auto vf = f.as<rs2::video_frame>();
-                /*
-                Frame my_f = Frame(vf.get_data(), vf.get_timestamp(),
-                                   vf.get_data_size(), vf.get_width(),
-                                   vf.get_height(), vf.get_bytes_per_pixel(),
-                                   vf.get_stride_in_bytes(), loc_ts);
-
-                frames[f.get_profile().unique_id()].push_back(my_f);
-                */
-                if (vf.get_bytes_per_pixel() == 2) {
-                    size_t sz = vf.get_data_size();
-                    memcpy((void *) ((uint8_t *) cur_depth_mfd_ptr + idx_depth * sz), vf.get_data(), sz);
-                    idx_depth++;
-                } else {
-                    size_t sz = vf.get_data_size();
-                    memcpy((void *) ((uint8_t *) cur_color_mfd_ptr + idx_color * sz), vf.get_data(), sz);
-                    idx_color.fetch_add(1, std::memory_order_relaxed);
-                }
-            }
-        }
-    };
-
+    std::mutex mux;
 
     rs2::pipeline pipe;
     rs2::config cfg;
@@ -379,77 +492,79 @@ int main() {
     //cout << duration_cast<milliseconds>(t2 - t1).count() << endl;
 
 
+    std::atomic<volatile int> idx_color(0);
+    int idx_depth = 0;
+    auto rs_callback = RSCallback(color_mfd_ptrs[0], depth_mfd_ptrs[0],
+                                  color_depth_tss[0], idx_color, idx_depth, mux,
+                                  shared_mux);
+
+
     boost::asio::thread_pool thread_pool(4);
-    rs2::pipeline_profile profiles = pipe.start(callback);
+    rs2::pipeline_profile profiles = pipe.start(rs_callback);
 
     bool start_statusA = grabber->start();
     //cout << "CamA started succefully : " << start_statusA << endl;
     bool start_statusB = grabber2->start();
     //cout << "CamB started succefully : " << start_statusB << std::endl;
-    for(int not_been = 0; not_been < number_of_records; ++not_been) {
+    for (int cur_idx = 0; cur_idx < number_of_records; ++cur_idx) {
 
-        //sleep_for(nanoseconds(300000000000));
-
-        while(idx_color.load() < 1790){
+        while (idx_color.load() < 1750) {
             continue;
+        }
+
+        if(cur_idx == number_of_records - 1){
+            bool finish_statusA = grabber->stop();
+            //cout << "CamA stoped succefully : " << finish_statusA << endl;
+            bool finish_statusB = grabber2->stop();
+            //cout << "CamB stoped succefully : " << finish_statusB << endl;
+
+            pipe.stop();
         }
 
         //cout << "Cams Stopped: " << endl;
         //std::vector<Frame> depth_frames = frames[0];
         //Frame depth_frame0 = depth_frames[0];
         {
-            boost::unique_lock< boost::shared_mutex> lock(shared_mux);
-            auto save_callback = [&]() {
-                cur_color_mfd.close();
-                rename((save_dir + to_string(not_been) + "color.bin").c_str(),
-                       (save_dir + to_string(not_been) + "color_f.bin").c_str());
-                cur_depth_mfd.close();
-                rename((save_dir + to_string(not_been) + "depth.bin").c_str(),
-                       (save_dir + to_string(not_been) + "depth_f.bin").c_str());
+            boost::unique_lock<boost::shared_mutex> lock(shared_mux);
 
-                cur_tc1_mfd.close();
-                rename((save_dir + to_string(not_been) + "tc1.bin").c_str(),
-                       (save_dir + to_string(not_been) + "tc1_f.bin").c_str());
-                cur_tc2_mfd.close();
-                rename((save_dir + to_string(not_been) + "tc2.bin").c_str(),
-                       (save_dir + to_string(not_been) + "tc2_f.bin").c_str());
 
-                ofstream cd_fout;
-                string color_depth_ts_name = save_dir + to_string(not_been) + "color_depth_ts.bin";
-                cd_fout.open(color_depth_ts_name, ios::binary | ios::out);
-                cd_fout.write((char *) cur_color_depth_ts.data(),
-                              cur_color_depth_ts.size() * sizeof(long long int));
-                cd_fout.close();
-                rename((save_dir + to_string(not_been) + "color_depth_ts.bin").c_str(),
-                       (save_dir + to_string(not_been) + "color_depth_ts_f.bin").c_str());
 
-                ofstream tc_fout;
-                string tc_ts_name = save_dir + to_string(not_been) + "tc_ts.bin";
-                tc_fout.open(tc_ts_name, ios::binary | ios::out);
-                tc_fout.write((char *) cur_HT_frames_b1_ts.data(),
-                              cur_HT_frames_b1_ts.size() * sizeof(long long int));
-                tc_fout.close();
-                rename((save_dir + to_string(not_been) + "tc_ts.bin").c_str(),
-                       (save_dir + to_string(not_been) + "tc_ts_f.bin").c_str());
-            };
+            auto start = high_resolution_clock::now();
+
+            auto save_callback = SaveCallback(color_mapped_fds[cur_idx],
+                                              depth_mapped_fds[cur_idx],
+                                              tc1_mapped_fds[cur_idx],
+                                              tc2_mapped_fds[cur_idx],
+                                              rs_callback.color_depth_ts,
+                                              tc1_callback.tc_ts,
+                                              tc2_callback.tc_ts,
+                                              cur_idx, save_dir);
 
             post(thread_pool, save_callback);
 
-            cur_tc1_mfd = tc1_mapped_fds[++cur_idx];
-            cur_tc1_mfd_ptr = tc1_mfd_ptrs[cur_idx];
-            cur_HT_frames_b1_ts = HT_tss_vec[cur_idx];
+            if(cur_idx == number_of_records-1){
+                break;
+            }
 
-            cur_tc2_mfd = tc2_mapped_fds[cur_idx];
-            cur_tc2_mfd_ptr = tc2_mfd_ptrs[cur_idx];
-            //auto cur_HT_frames_b2_ts = HT_tss_vec[0];
+            *tc1_callback.tc_mfd_ptr = tc1_mfd_ptrs[cur_idx+1];
+            tc1_callback.tc_ts = HT1_tss_vec[cur_idx+1];
+            tc1_callback.idx_tc = 0;
 
-            cur_color_mfd = color_mapped_fds[cur_idx];
-            cur_color_mfd_ptr = color_mfd_ptrs[cur_idx];
+            *tc2_callback.tc_mfd_ptr = tc2_mfd_ptrs[cur_idx+1];
+            tc2_callback.tc_ts = HT2_tss_vec[cur_idx+1];
+            tc2_callback.idx_tc = 0;
 
-            cur_depth_mfd = depth_mapped_fds[cur_idx];
-            cur_depth_mfd_ptr = depth_mfd_ptrs[cur_idx];
+            *rs_callback.color_mfd_ptr = color_mfd_ptrs[cur_idx+1];
+            *rs_callback.depth_mfd_ptr = depth_mfd_ptrs[cur_idx+1];
+            rs_callback.color_depth_ts = color_depth_tss[cur_idx+1];
+            rs_callback.idx_color.store(0);
+            rs_callback.idx_depth = 0;
 
-            cur_color_depth_ts = color_depth_tss[cur_idx];
+            auto stop = high_resolution_clock::now();
+
+            auto duration = duration_cast<nanoseconds>(stop - start);
+
+            cout << duration.count() << endl;
         }
 
 
@@ -646,16 +761,10 @@ int main() {
         //auto stop = high_resolution_clock::now();
         //cout << duration_cast<milliseconds>(stop - start).count() << endl;
     }
-    bool finish_statusA = grabber->stop();
-    //cout << "CamA stoped succefully : " << finish_statusA << endl;
-    bool finish_statusB = grabber2->stop();
-    //cout << "CamB stoped succefully : " << finish_statusB << endl;
 
-    pipe.stop();
-    
+
     thread_pool.join();
 
     //cout << duration_cast<milliseconds>(not_been2[1] - not_been2[0]).count() << endl;
     return 0;
-
 }
