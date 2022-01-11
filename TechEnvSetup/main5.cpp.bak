@@ -175,14 +175,9 @@ public:
     // operator function () on objects of increment
     void operator()() {
         color_mapped_fd.close();
-
         depth_mapped_fd.close();
-
-
         tc1_mapped_fd.close();
-
         tc2_mapped_fd.close();
-
 
         ofstream cd_fout;
         string color_depth_ts_name = save_dir + to_string(idx) + "color_depth_ts.bin";
@@ -213,11 +208,12 @@ public:
 
 int main() {
 
-    string save_dir = "E:/";
+    string save_dir = "G:/Vista_project/";
+
+    //Connect first Thermal Cam with default settings
 
     auto serialNumber = "070A1912";
     auto wic = wic::findAndConnect(serialNumber);
-
 
     if (!wic) {
         cerr << "Could not connect WIC: " << serialNumber << endl;
@@ -230,6 +226,8 @@ int main() {
              << wic::responseStatusToStr(defaultRes.first) << endl;
         return 2;
     }
+
+    //Connect second Thermal Cam with default settings
 
     auto serialNumber2 = "069A1912";
     auto wic2 = wic::findAndConnect(serialNumber2);
@@ -246,7 +244,7 @@ int main() {
         return 2;
     }
 
-
+    //Additional settings done in wic example code
 
     // enable advanced features
     wic->iKnowWhatImDoing();
@@ -254,21 +252,25 @@ int main() {
     wic2->iKnowWhatImDoing();
     // set advanced radiometry if core supports it
 
-
     // set core gain
     auto gain = wic->setGain(wic::GainMode::High);
 
     // set core gain
     auto gain2 = wic2->setGain(wic::GainMode::High);
 
-    auto grabber = wic->frameGrabber();
-    grabber->setup();
+    auto grabber1 = wic->frameGrabber();
+    grabber1->setup();
 
     auto grabber2 = wic2->frameGrabber();
     grabber2->setup();
 
+
+    //Manual mode of camera adjustment
+
     auto status1 = wic->setFFCMode(wic::FFCModes::Manual);
     auto status2 = wic2->setFFCMode(wic::FFCModes::Manual);
+
+    //Sanity check with cameras resolutions
 
     auto resolution = wic->getResolution();
     if (resolution.first == 0 || resolution.second == 0) {
@@ -282,23 +284,35 @@ int main() {
         return 3;
     }
 
-    int time_to_record = 2;
+    //No-Zoom in thermal cams
+    auto zoom_video_mode_None = wic::VideoModeZoom(0);
+    wic->setVideoModeZoom(zoom_video_mode_None);
+    wic2->setVideoModeZoom(zoom_video_mode_None);
 
+    //time to record of a partion between ctx-switch to he next memory-block to write
+
+    int time_to_record = 30;
+
+    //cameras fps
     int rs_fps = 30;
     int tc_fps = 9;
 
+    //depth and rgb params
     int rgb_ch = 3;
     int depth_px_sz = 2;
     int tc_px_sz = 2;
 
+    //memory allocations size for single image and for total of images per
+    // memory block (time_to_record function)
     size_t total_tc_size = 640 * 512 * tc_px_sz * tc_fps * time_to_record;
     size_t tc_size = 640 * 512 * 2;
 
     long long color_size = 720LL * 1280 * rgb_ch * rs_fps * time_to_record;
     long long depth_size = 720LL * 1280 * depth_px_sz * rs_fps * time_to_record;
 
-
-    int number_of_records = 4;
+    //number of partitions which gives:
+    // total time of recording = number_of_records * time_to_record
+    int number_of_records = 1;
 
     vector <vector<long long int>> HT1_tss_vec(number_of_records);
     vector <vector<long long int>> HT2_tss_vec(number_of_records);
@@ -379,7 +393,7 @@ int main() {
                                     tc_size, tc2_mutex, shared_mux);
 
     //auto handler_a = handlerA(HT_frames_b1, HT_frames_b1_ts);
-    grabber->bindBufferHandler(tc1_callback);
+    grabber1->bindBufferHandler(tc1_callback);
 
     //auto handler_b = handlerB(HT_frames_b2, HT_frames_b2_ts);
     grabber2->bindBufferHandler(tc2_callback);
@@ -407,21 +421,23 @@ int main() {
                                   shared_mux);
 
 
-    boost::asio::thread_pool thread_pool(4);
+    boost::asio::thread_pool thread_pool(number_of_records);
+
+    cout << "Recording Started" << endl;
     rs2::pipeline_profile profiles = pipe.start(rs_callback);
 
-    bool start_statusA = grabber->start();
+    bool start_statusA = grabber1->start();
     //cout << "CamA started succefully : " << start_statusA << endl;
     bool start_statusB = grabber2->start();
     //cout << "CamB started succefully : " << start_statusB << std::endl;
     for (int cur_idx = 0; cur_idx < number_of_records; ++cur_idx) {
 
-        while (idx_color.load() < 50) { //time_to_record * 30 - 10
+        while (idx_color.load() < time_to_record * 30 - time_to_record) { //TODO: the last substracted value is a hyper-parameter (a funtion of time_to_record, the bigger the value
             continue;
         }
 
         if(cur_idx == number_of_records - 1){
-            bool finish_statusA = grabber->stop();
+            bool finish_statusA = grabber1->stop();
             //cout << "CamA stoped succefully : " << finish_statusA << endl;
             bool finish_statusB = grabber2->stop();
             //cout << "CamB stoped succefully : " << finish_statusB << endl;
@@ -674,5 +690,6 @@ int main() {
     thread_pool.join();
 
     //cout << duration_cast<milliseconds>(not_been2[1] - not_been2[0]).count() << endl;
+    cout << "Finished";
     return 0;
 }
