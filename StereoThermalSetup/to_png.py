@@ -11,16 +11,16 @@ def main():
     files = [f for f in files if len(f.split('.'))>1 and f.split('.')[1] == "bin"]
     left = [f for f in files if "tc1" in f and "ts" not in f]
     right = [f for f in files if "tc2" in f and "ts" not in f]
-    left = [left[0]]
-    right = [right[0]]
+    left = left[1:-1]
+    right = right[1:-1]
     img_size = 640*512*2
     name = 0
     for l, r in zip(left,right):
         with open(path+l, "rb") as left_bytes_stream, open(path+r, "rb") as right_bytes_stream:
             while(True):
                 left_img_bytes = left_bytes_stream.read(img_size)
-                righ_img_bytes = right_bytes_stream.read(img_size)
-                if len(left_img_bytes) != img_size or len(righ_img_bytes) != img_size:
+                right_img_bytes = right_bytes_stream.read(img_size)
+                if len(left_img_bytes) != img_size or len(right_img_bytes) != img_size:
                     break
                 left_stream = io.BytesIO(left_img_bytes)
                 bytes = left_stream.getbuffer()
@@ -32,7 +32,7 @@ def main():
                 #left_img_png = Image.open(y)
                 lr = left_img.save(left_path + str(name)+".png", format='PNG')
 
-                right_stream = io.BytesIO(righ_img_bytes)
+                right_stream = io.BytesIO(right_img_bytes)
                 bytes = right_stream.getbuffer()
                 right_img_np = np.frombuffer(bytes, dtype='uint16')
                 right_img_np_norm = (right_img_np - np.min(right_img_np)) / (np.max(right_img_np) - np.min(right_img_np))
