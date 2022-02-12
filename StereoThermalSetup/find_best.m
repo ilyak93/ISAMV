@@ -1,30 +1,30 @@
-left_images = string(ls("G:\Vista_project\cur\left\"));
-left_images = left_images(3:end);
-left_images_fp = arrayfun(@(s) append("G:\Vista_project\cur\left\", s), left_images);
+left_images = string(ls("G:\Vista_project\CALIB_NEW\left_best\"));
+left_images = left_images(3:end-1);
+left_images_path = arrayfun(@(s) append("G:\Vista_project\CALIB_NEW\left_best\", s), left_images);
 
-right_images = string(ls("G:\Vista_project\cur\right\"));
-right_images = right_images(3:end);
-right_images_fp = arrayfun(@(s) append("G:\Vista_project\cur\right\", s), right_images);
 
-errors = zeros(1,length(left_images));
+right_images = string(ls("G:\Vista_project\CALIB_NEW\right_best\"));
+right_images = right_images(3:end-1);
+right_images_path = arrayfun(@(s) append("G:\Vista_project\CALIB_NEW\right_best\", s), right_images);
 
-for i=1:length(left_images)
-    left = [left_images_fp(i), left_images_fp(i)];
-    right = [right_images_fp(i), right_images_fp(i)];
-    [imagePoints,boardSize] = detectCheckerboardPoints(left, right);
-    
-    squareSize = 20;
-    worldPoints = generateCheckerboardPoints(boardSize,squareSize);
 
-    I = imread(left_images_fp(i)); 
-    imageSize = [size(I,1),size(I,2)];
-    stereoParams = estimateCameraParameters(imagePoints,worldPoints,'ImageSize',imageSize);
-    errors(i) = stereoParams.MeanReprojectionError;
-end
+[imagePoints,boardSize] = detectCheckerboardPoints(left_images_path, right_images_path);
 
-[sorted_errors, indices] = sort(errors);
+squareSize = 20;
+worldPoints = generateCheckerboardPoints(boardSize,squareSize);
 
-for i=1:10
-    movefile(left_images_fp(indices(i)), "G:\Vista_project\cur\left_used\"+left_images(indices(i)))
-    movefile(right_images_fp(indices(i)), "G:\Vista_project\cur\right_used\"+right_images(indices(i)))
+imageSize = [512,640];
+stereoParams = estimateCameraParameters(imagePoints,worldPoints,'ImageSize',imageSize);
+[all_errors] = myComputeReprojectionErrors(stereoParams);
+ mean_pair_error = mean(sum(all_errors,2), 2);
+[mn, min_idx] = sort(mean_pair_error);
+
+left_dest = "G:\Vista_project\CALIB_NEW\left_best\left\";
+right_dest = "G:\Vista_project\CALIB_NEW\right_best\right\";
+
+n_min = 60;
+for n=1:length(min_idx(1:n_min))
+    cur_idx = min_idx(n);
+    copyfile(left_images_path(cur_idx), left_dest);
+    copyfile(right_images_path(cur_idx), right_dest);
 end

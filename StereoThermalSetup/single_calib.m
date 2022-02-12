@@ -1,22 +1,22 @@
-%images = string(ls("G:\Vista_project\cur\"));
-%images = images(3:end);
-%images = arrayfun(@(s) append("G:\Vista_project\cur\", s), images);
-images = ["G:\Vista_project\cur\left_used\37_left.png", "G:\Vista_project\cur\left_used\37_left.png"];
-[imagePoints, boardSize] = detectCheckerboardPoints(images);
-imagePoints = squeeze(imagePoints);
-squareSizeInMM = 20;
-worldPoints = generateCheckerboardPoints(boardSize,squareSizeInMM);
+images = string(ls("G:\Vista_project\CALIB_NEW\left_best\left\"));
+images = images(3:end);
+images_path = arrayfun(@(s) append("G:\Vista_project\CALIB_NEW\left_best\left\", s), images);
 
-I = imread("G:\Vista_project\cur\left_used\37_left.png"); 
-imageSize = [size(I, 1),size(I, 2)];
+
+[imagePoints,boardSize] = detectCheckerboardPoints(images_path);
+
+squareSize = 20;
+worldPoints = generateCheckerboardPoints(boardSize, squareSize);
+
+imageSize = [512, 640];
 params = estimateCameraParameters(imagePoints,worldPoints,'ImageSize',imageSize);
 showReprojectionErrors(params);
 figure;
 showExtrinsics(params);
-drawnow;
 
+drawnow;
 figure; 
-imshow(I); 
+imshow(imageFileNames{1}); 
 hold on;
 plot(imagePoints(:,1,1), imagePoints(:,2,1),'go');
 plot(params.ReprojectedPoints(:,1,1),params.ReprojectedPoints(:,2,1),'r+');
