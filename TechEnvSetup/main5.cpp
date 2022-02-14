@@ -61,6 +61,8 @@ public:
         boost::shared_lock<boost::shared_mutex> shared_lock(this->shared_mux);
         std::lock_guard<std::mutex> lock(this->mux);
         if (rs2::frameset fs = frame.as<rs2::frameset>()) {
+            rs2::align align(RS2_STREAM_COLOR);
+            fs = align.process(fs);
             //rs2::disparity_transform disparity2depth(false);
             //fs = fs.apply_filter(disparity2depth);
             // With callbacks, all synchronized stream will arrive in a single frameset
@@ -207,9 +209,9 @@ public:
 
 
 int main() {
-    
-    string save_dir = "E:/";
-    
+
+    string save_dir = "G:/Vista_project/";
+
     //Connect first Thermal Cam with default settings
 
     auto serialNumber = "070A1912";
@@ -219,7 +221,7 @@ int main() {
         cerr << "Could not connect WIC: " << serialNumber << endl;
         return 1;
     }
-    
+
     auto defaultRes = wic->doDefaultWICSettings();
     if (defaultRes.first != wic::ResponseStatus::Ok) {
         cerr << "DoDefaultWICSettings: "
@@ -245,7 +247,7 @@ int main() {
     }
 
     //Additional settings done in wic example code
-    
+
     // enable advanced features
     wic->iKnowWhatImDoing();
     // enable advanced features
@@ -265,12 +267,18 @@ int main() {
     grabber2->setup();
 
 
-    //Manual mode of camera adjustment 
-    
+    //Manual mode of camera adjustment
+
     auto status1 = wic->setFFCMode(wic::FFCModes::Manual);
     auto status2 = wic2->setFFCMode(wic::FFCModes::Manual);
 
-    //Sanity check with cameras resolutions 
+    auto emode = wic::ExternalSyncMode(0x0001);
+    auto resp1 = wic->setExternalSyncMode(emode);
+
+    auto emode2 = wic::ExternalSyncMode(0x0002);
+    auto resp2 = wic2->setExternalSyncMode(emode2);
+
+    //Sanity check with cameras resolutions
 
     auto resolution = wic->getResolution();
     if (resolution.first == 0 || resolution.second == 0) {
@@ -283,7 +291,7 @@ int main() {
         cerr << "Invalid resolution, core detection error." << endl;
         return 3;
     }
-    
+
     //No-Zoom in thermal cams
     auto zoom_video_mode_None = wic::VideoModeZoom(0);
     wic->setVideoModeZoom(zoom_video_mode_None);
@@ -291,7 +299,7 @@ int main() {
 
     //time to record of a partion between ctx-switch to he next memory-block to write
 
-    int time_to_record = 60;
+    int time_to_record = 30;
 
     //cameras fps
     int rs_fps = 30;
@@ -302,7 +310,7 @@ int main() {
     int depth_px_sz = 2;
     int tc_px_sz = 2;
 
-    //memory allocations size for single image and for total of images per 
+    //memory allocations size for single image and for total of images per
     // memory block (time_to_record function)
     size_t total_tc_size = 640 * 512 * tc_px_sz * tc_fps * time_to_record;
     size_t tc_size = 640 * 512 * 2;
@@ -310,7 +318,7 @@ int main() {
     long long color_size = 720LL * 1280 * rgb_ch * rs_fps * time_to_record;
     long long depth_size = 720LL * 1280 * depth_px_sz * rs_fps * time_to_record;
 
-    //number of partitions which gives: 
+    //number of partitions which gives:
     // total time of recording = number_of_records * time_to_record
     int number_of_records = 2;
 
@@ -422,6 +430,8 @@ int main() {
 
 
     boost::asio::thread_pool thread_pool(number_of_records);
+
+    cout << "Recording Started" << endl;
     rs2::pipeline_profile profiles = pipe.start(rs_callback);
 
     bool start_statusA = grabber1->start();
