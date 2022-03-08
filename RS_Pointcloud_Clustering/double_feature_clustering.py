@@ -6,8 +6,7 @@ import numpy as np
 import scipy
 from open3d.cpu.pybind.geometry import KDTreeSearchParam, KDTreeSearchParamKNN
 
-from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering, OPTICS, \
-                                    MeanShift, SpectralClustering
+from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering, OPTICS, MeanShift, SpectralClustering
 from matplotlib import pyplot as plt
 
 # #############################################################################
@@ -36,8 +35,7 @@ depth_raw1 = o3d.io.read_image("ex1_d.png")
 
 
 rgbd_image1 = o3d.geometry.RGBDImage.create_from_color_and_depth(
-    color_raw1, depth_raw1, depth_scale=1000.0, depth_trunc=5,
-    convert_rgb_to_intensity=False)
+    color_raw1, depth_raw1, depth_scale=1000.0, depth_trunc=5, convert_rgb_to_intensity=False)
 print(rgbd_image1)
 
 plt.subplot(1, 2, 1)
@@ -60,18 +58,40 @@ pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
 # Flip it, otherwise the pointcloud will be upside down
 pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
 print("original ds pointcloud")
-pcd = pcd.voxel_down_sample(voxel_size=0.03)
+pcd = pcd.voxel_down_sample(voxel_size=0.02)
 o3d.visualization.draw_geometries([pcd])
 
 
-
-
-#XYZ clustering
+#XYZ-RGB clustering
 '''
-points = np.asarray(pcd.points)
+points_weight = 10
+color_weight = 50 # 50
 
-db = DBSCAN(eps=0.05, min_samples=2, metric='euclidean', algorithm='auto') #eps 5 is too much
-db.fit(points)
+points = np.asarray(pcd.points) * points_weight
+colors = np.asarray(pcd.colors) * color_weight
+
+z_min = points[:,2].min()
+z_max = points[:,2].max()
+x_min = points[:,0].min()
+x_max = points[:,0].max()
+y_min = points[:,1].min()
+y_max = points[:,1].max()
+
+c1_min = colors[:,2].min()
+c1_max = colors[:,2].max()
+c2_min = colors[:,0].min()
+c2_max = colors[:,0].max()
+c3_min = colors[:,1].min()
+c3_max = colors[:,1].max()
+
+
+
+features = np.concatenate((points, colors), axis=1)
+
+
+
+db = DBSCAN(eps=0.9, min_samples=5, metric='euclidean', algorithm='auto') #eps 5 is too much
+db.fit(features)
 labels = db.labels_
 
 colors = []
@@ -92,67 +112,37 @@ clustered_pcd.colors = o3d.utility.Vector3dVector(labels_colors)
 print("downsampled 0.01 voxel and sklearn sbcanned clustered pointcloud")
 o3d.visualization.draw_geometries([clustered_pcd])
 '''
-
 '''
-#colors of XYZ clustering
-points = np.asarray(pcd.points)
-pt_colors = np.asarray(pcd.colors)
-
-
-db = DBSCAN(eps=0.005, min_samples=5, metric='euclidean', algorithm='auto') #eps 5 is too much
-db.fit(pt_colors)
-labels = db.labels_
-
-colors_dict = {}
-for name, hex in matplotlib.colors.cnames.items():
-    colors_dict[name] = matplotlib.colors.to_rgb(hex)
-colors_dict.pop("black")
-num_of_colors = len(colors_dict);
-my_colors_dict = dict()
-
-for key, color in enumerate(colors_dict.values()):
-    my_colors_dict[key] = [t for t in color]
-
-colors = []
-for i in range(labels.shape[0]):
-    if labels[i] == -1:
-        colors.append([0,0,0])
-    else:
-        color_idx = labels[i] % num_of_colors
-        colors.append(my_colors_dict[color_idx])
-
-labels_colors = np.asarray(colors)
-
-print("unique my dbscan number of clusters:" + str(np.unique(labels).shape))
-
-clustered_pcd = o3d.geometry.PointCloud()
-clustered_pcd.points = o3d.utility.Vector3dVector(points)
-clustered_pcd.colors = o3d.utility.Vector3dVector(labels_colors)
-print("downsampled 0.01 voxel and sklearn sbcanned clustered pointcloud")
-o3d.visualization.draw_geometries([clustered_pcd])
-'''
-
-'''
-#Normals clustering
+#XYZ-Normals clustering
 pcd.estimate_normals(
     search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
 
-points = np.asarray(pcd.points)
-normals = np.asarray(pcd.colors)
+points_weight = 10
+normals_weight = 20
 
-db = DBSCAN(eps=0.005, min_samples=2, metric='euclidean', algorithm='auto') #eps 5 is too much
-db.fit(normals)
+points = np.asarray(pcd.points) * points_weight
+normals = np.asarray(pcd.normals) * normals_weight
+
+
+z_min = points[:,2].min()
+z_max = points[:,2].max()
+x_min = points[:,0].min()
+x_max = points[:,0].max()
+y_min = points[:,1].min()
+y_max = points[:,1].max()
+
+c1_min = normals[:,2].min()
+c1_max = normals[:,2].max()
+c2_min = normals[:,0].min()
+c2_max = normals[:,0].max()
+c3_min = normals[:,1].min()
+c3_max = normals[:,1].max()
+
+features = np.concatenate((points, normals), axis=1)
+
+db = DBSCAN(eps=3, min_samples=10, metric='euclidean', algorithm='auto') #eps 5 is too much
+db.fit(features)
 labels = db.labels_
-
-colors_dict = {}
-for name, hex in matplotlib.colors.cnames.items():
-    colors_dict[name] = matplotlib.colors.to_rgb(hex)
-colors_dict.pop("black")
-num_of_colors = len(colors_dict);
-my_colors_dict = dict()
-
-for key, color in enumerate(colors_dict.values()):
-    my_colors_dict[key] = [t for t in color]
 
 colors = []
 for i in range(labels.shape[0]):
@@ -172,7 +162,6 @@ clustered_pcd.colors = o3d.utility.Vector3dVector(labels_colors)
 print("downsampled 0.01 voxel and sklearn sbcanned clustered pointcloud")
 o3d.visualization.draw_geometries([clustered_pcd])
 '''
-
 
 #Clustering velocities
 #import 2 images, create pcds and vizualize,
@@ -247,8 +236,43 @@ pcd_velocities_viz.normals = o3d.utility.Vector3dVector(velocities)
 #o3d.visualization.draw_geometries([pcd1])
 o3d.visualization.draw_geometries([pcd_velocities_viz], point_show_normal=True)
 
-db = DBSCAN(eps=0.0091, min_samples=2, metric='euclidean', algorithm='auto') #eps 5 is too much
-db.fit(velocities)
+points_weight = 10
+velocities_weight = 50
+
+points = np.asarray(pcd1.points) * points_weight
+velocities = velocities * velocities_weight
+
+z_min = points[:,2].min()
+z_max = points[:,2].max()
+x_min = points[:,0].min()
+x_max = points[:,0].max()
+y_min = points[:,1].min()
+y_max = points[:,1].max()
+
+n1_min = velocities[:,2].min()
+n1_max = velocities[:,2].max()
+n2_min = velocities[:,0].min()
+n2_max = velocities[:,0].max()
+n3_min = velocities[:,1].min()
+n3_max = velocities[:,1].max()
+
+
+features = np.concatenate((points, velocities), axis=1)
+#features = np.concatenate((points, colors), axis=1)
+
+colors_dict = {}
+for name, hex in matplotlib.colors.cnames.items():
+    colors_dict[name] = matplotlib.colors.to_rgb(hex)
+colors_dict.pop("black")
+num_of_colors = len(colors_dict);
+my_colors_dict = dict()
+
+for key, color in enumerate(colors_dict.values()):
+    my_colors_dict[key] = [t for t in color]
+
+
+db = DBSCAN(eps=1.5, min_samples=2, metric='euclidean', algorithm='auto') #eps 5 is too much
+db.fit(features)
 labels = db.labels_
 colors = []
 for i in range(labels.shape[0]):
@@ -265,16 +289,13 @@ print("unique my dbscan number of clusters:" + str(np.unique(labels).shape))
 #plt.hist(labels, bins='auto')
 #plt.show()
 
-points = np.asarray(pcd1.points)
-
 clustered_pcd1 = o3d.geometry.PointCloud()
 clustered_pcd1.points = o3d.utility.Vector3dVector(points)
 clustered_pcd1.colors = o3d.utility.Vector3dVector(labels_colors)
 print("downsampled 0.01 voxel and sklearn sbcanned clustered pointcloud")
 o3d.visualization.draw_geometries([clustered_pcd1])
 '''
-
-#distances clustering
+# compute distances and cluster
 '''
 intrinsic = o3d.camera.PinholeCameraIntrinsic(width=1280, height=720,
                                               fx=787.998596191406,
@@ -335,9 +356,38 @@ dd, ii = my_compute_point_cloud_distance(np.asarray(pcd1.points), pcd2)
 
 distances = np.sum(np.asarray(pcd2.points)[ii.astype(int),:] - np.asarray(pcd1.points)[:,:], axis=1).reshape(-1,1)
 
+points_weight = 10
+distances_weight = 25
 
-db = DBSCAN(eps=0.0005, min_samples=5, metric='euclidean', algorithm='auto') #eps 5 is too much
-db.fit(distances)
+points = np.asarray(pcd1.points) * points_weight
+distances = distances * distances_weight
+
+z_min = points[:,2].min()
+z_max = points[:,2].max()
+x_min = points[:,0].min()
+x_max = points[:,0].max()
+y_min = points[:,1].min()
+y_max = points[:,1].max()
+
+n1_min = distances.min()
+n1_max = distances.max()
+
+features = np.concatenate((points, distances), axis=1)
+#features = np.concatenate((points, colors), axis=1)
+
+colors_dict = {}
+for name, hex in matplotlib.colors.cnames.items():
+    colors_dict[name] = matplotlib.colors.to_rgb(hex)
+colors_dict.pop("black")
+num_of_colors = len(colors_dict);
+my_colors_dict = dict()
+
+for key, color in enumerate(colors_dict.values()):
+    my_colors_dict[key] = [t for t in color]
+
+
+db = DBSCAN(eps=1.5, min_samples=2, metric='euclidean', algorithm='auto') #eps 5 is too much
+db.fit(features)
 labels = db.labels_
 colors = []
 for i in range(labels.shape[0]):
@@ -354,16 +404,9 @@ print("unique my dbscan number of clusters:" + str(np.unique(labels).shape))
 #plt.hist(labels, bins='auto')
 #plt.show()
 
-points = np.asarray(pcd1.points)
-
 clustered_pcd1 = o3d.geometry.PointCloud()
 clustered_pcd1.points = o3d.utility.Vector3dVector(points)
 clustered_pcd1.colors = o3d.utility.Vector3dVector(labels_colors)
 print("downsampled 0.01 voxel and sklearn sbcanned clustered pointcloud")
 o3d.visualization.draw_geometries([clustered_pcd1])
-
-
-source_temp = copy.deepcopy(pcd1)
-target_temp = copy.deepcopy(pcd2)
-o3d.visualization.draw_geometries([source_temp, target_temp])
 '''

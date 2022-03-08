@@ -6,8 +6,7 @@ import numpy as np
 import scipy
 from open3d.cpu.pybind.geometry import KDTreeSearchParam, KDTreeSearchParamKNN
 
-from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering, OPTICS, \
-                                    MeanShift, SpectralClustering
+from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering, OPTICS, MeanShift, SpectralClustering
 from matplotlib import pyplot as plt
 
 # #############################################################################
@@ -36,8 +35,7 @@ depth_raw1 = o3d.io.read_image("ex1_d.png")
 
 
 rgbd_image1 = o3d.geometry.RGBDImage.create_from_color_and_depth(
-    color_raw1, depth_raw1, depth_scale=1000.0, depth_trunc=5,
-    convert_rgb_to_intensity=False)
+    color_raw1, depth_raw1, depth_scale=1000.0, depth_trunc=5, convert_rgb_to_intensity=False)
 print(rgbd_image1)
 
 plt.subplot(1, 2, 1)
@@ -67,7 +65,6 @@ o3d.visualization.draw_geometries([pcd])
 
 
 #XYZ clustering
-'''
 points = np.asarray(pcd.points)
 
 db = DBSCAN(eps=0.05, min_samples=2, metric='euclidean', algorithm='auto') #eps 5 is too much
@@ -91,7 +88,7 @@ clustered_pcd.points = o3d.utility.Vector3dVector(points)
 clustered_pcd.colors = o3d.utility.Vector3dVector(labels_colors)
 print("downsampled 0.01 voxel and sklearn sbcanned clustered pointcloud")
 o3d.visualization.draw_geometries([clustered_pcd])
-'''
+
 
 '''
 #colors of XYZ clustering
