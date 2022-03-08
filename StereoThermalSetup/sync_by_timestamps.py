@@ -30,10 +30,11 @@ def winsort(data):
     cmp_fnc = lambda psz1, psz2: _StrCmpLogicalW(psz1, psz2)
     return sorted(data, key=cmp_to_key(cmp_fnc))
 
-left_path = "G:/Vista_project/times_meavrer/left/"
-right_path = "G:/Vista_project/times_meavrer/right/"
-rs_path = "G:/Vista_project/times_meavrer/aligned_rs_both/"
-dest_path = "G:/Vista_project/times_meavrer/sync/"
+left_path = "G:/Vista_project/new_motion/left/"
+right_path = "G:/Vista_project/new_motion/right/"
+rs_path = "G:/Vista_project/new_motion/aligned_rs_both/"
+dest_path = "G:/Vista_project/new_motion/sync/"
+dest_presentation_path = "G:/Vista_project/new_motion/sync_presentation/"
 
 left_tc_files = os.listdir(left_path)
 left_tc_files = winsort(left_tc_files)
@@ -59,7 +60,12 @@ for i in range(tc_len):
     all_combined[0:rgb_depth_combined.shape[0], 0:rgb_depth_combined.shape[1], :] = rgb_depth_combined
     all_combined[0:tc_combined.shape[0], rgb_depth_combined.shape[1]:, :] = np.stack((tc_combined, tc_combined, tc_combined), axis=-1)
     im = Image.fromarray(all_combined)
-    im.save(dest_path + str(i) + ".png", "PNG")
+    im.save(dest_presentation_path + str(i) + ".png", "PNG")
+    im = Image.fromarray(im_rgb)
+    im.save(dest_path + str(i) + "color.png", "PNG")
+    im = Image.fromarray(im_depth)
+    im.save(dest_path + str(i) + "depth.png", "PNG")
+
 
 
 
