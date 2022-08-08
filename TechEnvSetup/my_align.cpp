@@ -20,7 +20,7 @@ using namespace std;
 
 int main() {
 
-    std::ifstream infile("G:/Vista_project/times_meavrer/intrinsics_extrinsics.txt");
+    std::ifstream infile("G:/Vista_project/fusion/intrinsics_extrinsics.txt");
 
     std::string line;
     vector<string> depth;
@@ -72,17 +72,17 @@ int main() {
 
     depth_stream.register_extrinsics_to(color_stream,
                                         {
-        {
-            stof(depth_to_color[1]),stof(depth_to_color[2]),
-            stof(depth_to_color[3]),stof(depth_to_color[4]),
-            stof(depth_to_color[5]),stof(depth_to_color[6]),
-            stof(depth_to_color[7]),stof(depth_to_color[8]),
-            stof(depth_to_color[9])
-            },
-            {
-            stof(depth_to_color[11]), stof(depth_to_color[12]),
-            stof(depth_to_color[12])
-            }
+                                                {
+                                                        stof(depth_to_color[1]),stof(depth_to_color[2]),
+                                                        stof(depth_to_color[3]),stof(depth_to_color[4]),
+                                                        stof(depth_to_color[5]),stof(depth_to_color[6]),
+                                                        stof(depth_to_color[7]),stof(depth_to_color[8]),
+                                                        stof(depth_to_color[9])
+                                                },
+                                                {
+                                                        stof(depth_to_color[11]), stof(depth_to_color[12]),
+                                                        stof(depth_to_color[12])
+                                                }
                                         });
 
     dev.create_matcher(RS2_MATCHER_DEFAULT);
@@ -94,7 +94,7 @@ int main() {
     depth_sensor.start(sync);
     color_sensor.start(sync);
 
-    rs2::align align(RS2_STREAM_COLOR);
+    rs2::align align(RS2_STREAM_DEPTH);
 
     rs2::frameset fs;
     rs2::frame depth_frame;
@@ -108,20 +108,31 @@ int main() {
     //inject the images
 
     DIR *dir;
-    struct dirent *ent_color;
-    struct dirent *ent_depth;
-    dir = opendir ("G:/Vista_project/times_meavrer/rs/");
+    struct dirent *ent;
+    struct dirent ent_depth;
+    struct dirent ent_color;
+    string path("G:/Vista_project/fusion/1/");
+    dir = opendir((path+string("/sync/")).c_str());
     assert(dir != NULL);
 
-    while ((ent_color = readdir (dir)) != NULL) {
-        if(string(ent_color->d_name).compare("..") == 0 || string(ent_color->d_name).compare(".") == 0)
+    while ((ent = readdir (dir)) != NULL) {
+        if(string(ent->d_name).compare("..") == 0 || string(ent->d_name).compare(".") == 0)
             continue;
-        ent_depth = readdir(dir);
-        string color_image_path = string("G:/Vista_project/times_meavrer/rs/") + string(ent_color->d_name);
-        string depth_image_path = string("G:/Vista_project/times_meavrer/rs/") + string(ent_depth->d_name);
+        ent_color = *ent;
+        ent = readdir(dir);
+        ent_depth = *ent;
+        string color_image_path = path + string("/sync/") + string(ent_color.d_name);
+        string depth_image_path = path + string("/sync/") + string(ent_depth.d_name);
         color_image = cv::imread(color_image_path.c_str(), cv::IMREAD_COLOR);
         depth_image = cv::imread(depth_image_path.c_str(),cv::IMREAD_UNCHANGED);
-
+        /*
+        cv::imshow("image1", color_image);
+        cv::waitKey(0);
+        cv::destroyAllWindows();
+        cv::imshow("image2", depth_image);
+        cv::waitKey(0);
+        cv::destroyAllWindows();
+        */
         color_sensor.on_video_frame({(void*) color_image.data, // Frame pixels from capture API
                                      [](void*) {}, // Custom deleter (if required)
                                      3 * 1280, 3, // Stride and Bytes-per-pixel
@@ -137,12 +148,15 @@ int main() {
 
         fs = sync.wait_for_frames();
         if (fs.size() == 2) {
+
             fs = align.process(fs);
             rs2::frame depth_frame = fs.get_depth_frame();
             rs2::frame color_frame = fs.get_color_frame();
 
-            cv::Mat aligned_image(720, 1280, CV_16UC1, (void*) (depth_frame.get_data()), 2 * 1280);
-            cv::imwrite("G:/Vista_project/times_meavrer/aligned_rs/" + string(ent_color->d_name), aligned_image);
+            cv::Mat aligned_image(720, 1280, CV_16UC1, (void *) (depth_frame.get_data()), 2 * 1280);
+            cv::imwrite(path + "/aligned_rs/" + string(ent_depth.d_name), aligned_image);
+            cv::Mat aligned_image2(720, 1280, CV_8UC3, (void *) (color_frame.get_data()), 3 * 1280);
+            cv::imwrite(path + "/aligned_rs/" + string(ent_color.d_name), aligned_image2);
         }
         idx++;
     }
