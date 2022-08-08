@@ -29,6 +29,8 @@
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
+#include "counting_semaphore.cpp"
+
 using namespace std;
 using namespace this_thread; // sleep_for, sleep_until
 using namespace chrono; // nanoseconds, system_clock, seconds
@@ -50,7 +52,7 @@ public:
                std::atomic<volatile int>& idxc, int& idxd, std::mutex& mx,
                boost::shared_mutex& smx) :
                idx_color(idxc), idx_depth(idxd),
-               color_depth_ts(ccdts), mux(mx), shared_mux(smx){
+               color_depth_ts(ccdts), mux(mx), shared_mux(smx) {
         *color_mfd_ptr = cmfd_ptr;
         *depth_mfd_ptr = dmfd_ptr;
 
@@ -334,7 +336,7 @@ public:
 
 
 int main() {
-    
+
     string save_dir = "G:/Vista_project/";
 
     //Connect first Thermal Cam with default settings
@@ -397,10 +399,10 @@ int main() {
     auto status1 = wic->setFFCMode(wic::FFCModes::Manual);
     auto status2 = wic2->setFFCMode(wic::FFCModes::Manual);
 
-    auto emode = wic::ExternalSyncMode(0x0001); //0x0001
+    auto emode = wic::ExternalSyncMode(0x0002); //0x0001
     auto resp1 = wic->setExternalSyncMode(emode);
 
-    auto emode2 = wic::ExternalSyncMode(0x0002); //0x0002
+    auto emode2 = wic::ExternalSyncMode(0x0001); //0x0002
     auto resp2 = wic2->setExternalSyncMode(emode2);
 
     //Sanity check with cameras resolutions
@@ -548,6 +550,20 @@ int main() {
     cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720, RS2_FORMAT_Z16);
     rs2::pipeline_profile profiles = pipe.start(cfg, rs_callback);
 
+    rs2::device selected_device = profiles.get_device();
+    auto depth_sensor = selected_device.first<rs2::depth_sensor>();
+
+    if (depth_sensor.supports(RS2_OPTION_EMITTER_ENABLED)) {
+        depth_sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 1.f); // Enable emitter
+        //depth_sensor.set_option(RS2_OPTION_EMITTER_ENABLED, 0.f); // Disable emitter
+    }
+    if (depth_sensor.supports(RS2_OPTION_LASER_POWER)) {
+        // Query min and max values:
+        auto range = depth_sensor.get_option_range(RS2_OPTION_LASER_POWER);
+        depth_sensor.set_option(RS2_OPTION_LASER_POWER, range.max); // Set max power
+        //depth_sensor.set_option(RS2_OPTION_LASER_POWER, 0.f); // Disable laser
+    }
+
     bool start_statusA = grabber1->start();
     //cout << "CamA started succefully : " << start_statusA << endl;
     bool start_statusB = grabber2->start();
@@ -564,9 +580,9 @@ int main() {
         }
 
         if(cur_idx == number_of_records - 1){
-            bool finish_statusB = grabber2->stop();
+            bool finish_statusB = grabber1->stop();
             //cout << "CamB stoped succefully : " << finish_statusB << endl;
-            bool finish_statusA = grabber1->stop();
+            bool finish_statusA = grabber2->stop();
             //cout << "CamA stoped succefully : " << finish_statusA << endl;
             pipe.stop();
         }
