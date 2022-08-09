@@ -6,7 +6,15 @@ from matplotlib import pyplot as plt
 import open3d as o3d
 from scipy import io
 
-
+'''
+print("Load a ply point cloud created by matlab")
+pcd_therm_matlab = o3d.io.read_point_cloud("G:\Vista_project/finish1/rs-ptc/"+"1.ply")
+pcd_therm_matlab.transform([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+o3d.visualization.draw_geometries([pcd_therm_matlab])
+points = np.asarray(pcd_therm_matlab.points)
+mn = points.min(axis=0)
+mx = points.max(axis=0)
+'''
 def create_output(vertices, colors, filename):
     colors = colors.reshape(-1, 3)
     vertices = np.hstack([vertices.reshape(-1,3), colors])
@@ -28,10 +36,12 @@ def create_output(vertices, colors, filename):
         np.savetxt(f, vertices, '%f %f %f %d %d %d')
 
 print('loading images...')
-imgL_depth = cv2.imread('G:/Vista_project/new_motion/left/250_761653140100.png', cv2.IMREAD_ANYDEPTH)
-imgR_depth = cv2.imread('G:/Vista_project/new_motion/right/250_761653091000.png', cv2.IMREAD_ANYDEPTH)
-imgL = np.round((imgL_depth - imgL_depth.min()) / (imgL_depth.max() - imgL_depth.min()) * 256).astype(np.uint8);
-imgR = np.round((imgR_depth - imgR_depth.min()) / (imgR_depth.max() - imgR_depth.min()) * 256).astype(np.uint8);
+imgL_depth = cv2.imread('G:/Vista_project/4/left_resized/41color.png', cv2.IMREAD_ANYDEPTH)
+imgR_depth = cv2.imread('G:/Vista_project/4/right_resized/41color.png', cv2.IMREAD_COLOR)
+imgL = np.round((imgL_depth - imgL_depth.min()) / (imgL_depth.max() - imgL_depth.min()) * 256).astype(np.uint8)
+#imgR = np.round((imgR_depth - imgR_depth.min()) / (imgR_depth.max() - imgR_depth.min()) * 256).astype(np.uint8)
+imgR = imgR_depth
+imgR = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
 
 # disparity range tuning
 # https://docs.opencv.org/trunk/d2/d85/classcv_1_1StereoSGBM.html
@@ -65,7 +75,7 @@ disparity = stereo.compute(imgL, imgR).astype(np.float32) / 16.0
 plt.imshow(disparity, 'gray')
 plt.show()
 
-disparity[disparity>0] = 128 - disparity[disparity>0]
+#disparity[disparity>0] = 128 - disparity[disparity>0]
 
 
 io.savemat('./dis.mat', {'disparity': disparity})
@@ -79,35 +89,32 @@ plt.show()
 
 print("\nGenerating the 3D map ...")
 h, w = imgL.shape[:2]
-focal_length = 0.8*w
+focal_length = 0.5*w
 
 # Perspective transformation matrix
 Q = np.float32([[1, 0, 0, -w/2.0],
                 [0, -1, 0,  h/2.0],
                 [0, 0, 0, -focal_length],
                 [0, 0, 1, 0]])
-'''
-Q = np.float32([[1,	0,	0,	0],
-               [0,	1,	0,	0],
-               [0,	0,	1,	-0.0066789887],
-               [22.707514,	-207.43671,	1450.2950,	1]])
 
-#Q = np.eye(4)
 '''
+Q = np.float32([
+[1,	0,	0,	0],
+[0,	-1,	0,	0],
+[0,	0,	0,	0.0060735759],
+[-1348.9779,	441.00906,	-2455.8965,	0]])
+Q = Q.transpose()
+'''
+
 points_3D = cv2.reprojectImageTo3D(disparity, Q)
-points_3D[:,:,1] = points_3D[:,:,1] / 600 + 0.0025
-points_3D[:,:,0] = points_3D[:,:,0] / 600 - 0.001
-points_3D[:,:,2] = points_3D[:,:,2] / 50 + 0.07
-filter_mask = points_3D[:,:,2] > -5 / 50 + 0.07
-points_3D[:,:,2][points_3D[:,:,2] < -5  / 50 + 0.07] = -np.inf
 
 #points_3D = scipy.io.loadmat('points.mat')['points3D']
 
 #points_3D[:,:,1] = points_3D[:,:,1] / -1
 
 colors = cv2.cvtColor(imgL,cv2.COLOR_GRAY2RGB)
-mask_map = disparity > 0
-mask_map = mask_map & filter_mask #& (imgL_depth > 2500)
+mask_map = disparity > 1
+mask_map = mask_map #& (imgL_depth > 2500)
 output_points = points_3D[mask_map]
 output_colors = colors[mask_map]
 
@@ -129,6 +136,10 @@ create_output(output_points, output_colors, output_file)
 print("Load a ply point cloud, print it, and render it")
 pcd_therm = o3d.io.read_point_cloud("./3dmap.ply")
 o3d.visualization.draw_geometries([pcd_therm])
+
+points = np.asarray(pcd_therm.points)
+xmin = points.min(axis=0)
+xmax = points.max(axis=0)
 
 #cv2.imshow('Left Image', image_left)
 #cv2.imshow('Right Image', image_right)
@@ -152,8 +163,6 @@ depth_frame = 'G:/Vista_project/new_motion/sync/250depth.png'
 depth_im = Image.fromarray(np.array(Image.open(depth_frame)).astype("uint16"))
 print("Image mode: ", depth_im.mode)
 np_depth_im = np.array(Image.open(depth_frame)).astype("uint16")
-
-
 
 color_raw = o3d.geometry.Image(np_color_im)
 depth_raw = o3d.geometry.Image(np_depth_im)
