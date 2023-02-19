@@ -29,6 +29,8 @@ Some illusrations from the report:
 
 ### Deep Learning depth predicted for stereo-thermal images and the built poiintcloud from it :
 
+![alt text](https://github.com/ilyak93/ISAMV/blob/main/imgs/deep_data.bmp)
+
 ![alt text](https://github.com/ilyak93/ISAMV/blob/main/imgs/deep.bmp)
 
 
