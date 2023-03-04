@@ -623,7 +623,7 @@ int main() {
 
             *rs_callback.color_mfd_ptr = color_mfd_ptrs[cur_idx+1];
             *rs_callback.depth_mfd_ptr = depth_mfd_ptrs[cur_idx+1];
-            *rs_callback.color_depth_ts_mfd_ptr[cur_idx+1];
+            *rs_callback.color_depth_ts_mfd_ptr = cd_ts_mfd_ptrs[cur_idx+1];
             rs_callback.idx_color.store(0);
             rs_callback.idx_depth = 0;
 
