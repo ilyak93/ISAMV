@@ -418,7 +418,7 @@ int main() {
     long long tc_ts_size = sizeof(long long int) * tc_fps * time_to_record;
     //number of partitions which gives:
     // total time of recording = number_of_records * time_to_record
-    int number_of_records = 5;
+    int number_of_records = 10;
 
     char **cd_ts_mfd_ptrs = (char **) new char *[number_of_records];
     mapped_file * cd_ts_mapped_fds = (mapped_file * ) new mapped_file[number_of_records];
@@ -613,6 +613,12 @@ int main() {
                 break;
             }
 
+            *rs_callback.color_mfd_ptr = color_mfd_ptrs[cur_idx+1];
+            *rs_callback.depth_mfd_ptr = depth_mfd_ptrs[cur_idx+1];
+            *rs_callback.color_depth_ts_mfd_ptr = cd_ts_mfd_ptrs[cur_idx+1];
+            rs_callback.idx_color.store(0);
+            rs_callback.idx_depth = 0;
+
             *tc1_callback.tc_mfd_ptr = tc1_mfd_ptrs[cur_idx+1];
             *tc1_callback.tc_ts_mfd_ptr = tc1_ts_mfd_ptrs[cur_idx+1];
             tc1_callback.idx_tc = 0;
@@ -621,17 +627,11 @@ int main() {
             *tc2_callback.tc_ts_mfd_ptr = tc2_ts_mfd_ptrs[cur_idx+1];
             tc2_callback.idx_tc = 0;
 
-            *rs_callback.color_mfd_ptr = color_mfd_ptrs[cur_idx+1];
-            *rs_callback.depth_mfd_ptr = depth_mfd_ptrs[cur_idx+1];
-            *rs_callback.color_depth_ts_mfd_ptr = cd_ts_mfd_ptrs[cur_idx+1];
-            rs_callback.idx_color.store(0);
-            rs_callback.idx_depth = 0;
+            //auto stop = high_resolution_clock::now();
 
-            auto stop = high_resolution_clock::now();
+            //auto duration = duration_cast<nanoseconds>(stop - start);
 
-            auto duration = duration_cast<nanoseconds>(stop - start);
-
-            cout << duration.count() << endl;
+            //cout << duration.count() << endl;
         }
     }
 
