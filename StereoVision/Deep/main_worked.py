@@ -41,7 +41,7 @@ if __name__ == '__main__':
         img_dir="C:/dataset/small_lrdd/"
     )
     test_size = 50
-    lengths = [len(dataset ) -test_size, test_size]
+    lengths = [len(dataset ) - test_size, test_size]
     train_set, val_set = torch.utils.data.random_split(dataset, lengths)
 
     from torch.utils.data import DataLoader
@@ -86,13 +86,14 @@ if __name__ == '__main__':
 
     for r in range(startRound, len(FADNet_loss_config["epoches"])):
         cycles = FADNet_loss_config["epoches"][r]
-        prev_cycles = FADNet_loss_config["epoches"][min(0 , r -1)]
+        prev_cycles = FADNet_loss_config["epoches"][min(0, r - 1)]
         for k in range(cycles):
             net.train()
             for [left_img, right_img], [target_disp, depths] in train_dataloader:
                 left_img = left_img.unsqueeze(dim=1) / max_uint16
                 right_img = right_img.unsqueeze(dim=1) / max_uint16
-                target_dis = torch.sqrt(target_disp.unsqueeze(dim=1).cuda())
+                #target_dis = torch.sqrt(target_disp.unsqueeze(dim=1).cuda())
+                target_dis = depths.unsqueeze(dim=1).cuda() / 1000
 
                 inputs = torch.cat((left_img, right_img), dim=1).cuda()
                 output_net1, output_net2 = net(inputs)
@@ -132,7 +133,8 @@ if __name__ == '__main__':
                 for [left_img, right_img], [target_disp, depths] in test_dataloader:
                     left_img = left_img.unsqueeze(dim=1) / max_uint16
                     right_img = right_img.unsqueeze(dim=1) / max_uint16
-                    target_dis = torch.sqrt(target_disp.unsqueeze(dim=1).cuda())
+                    #target_dis = torch.sqrt(target_disp.unsqueeze(dim=1).cuda())
+                    target_dis = depths.unsqueeze(dim=1).cuda() / 1000
 
                     inputs = torch.cat((left_img, right_img), dim=1).cuda()
                     output_net1, output_net2 = net(inputs)
@@ -154,13 +156,9 @@ if __name__ == '__main__':
                     if j % 2 == 0:
                         orig_viz = torch.cat((left_img[0].cpu(),
                                               right_img[0].cpu(),
-                                              target_dis[0].cpu(),
-                                              output_net2[0].cpu(),
-                                              output_net2[0].cpu() / max_uint16,
-                                              output_net2[0].cpu() / 256,
-                                              output_net2[0].cpu() * 256,
-                                              output_net2[0].cpu() * max_uint16
-                                              ), 0).unsqueeze(1)
+                                              target_dis[0].cpu() / 256,
+                                              output_net2[0].cpu() / 256),
+                                             0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
                                          img_tensor=grid, global_step=r * prev_cycles + k,
