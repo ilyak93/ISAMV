@@ -184,3 +184,10 @@ if __name__ == '__main__':
 
             writer.add_scalar("test/epoch/loss", test_losses.avg, r * prev_cycles + k)
             writer.add_scalar("test/epoch/EPE", test_flow2_EPEs.avg, r * prev_cycles + k)
+            if (r * prev_cycles + k) % 10 == 1:
+                torch.save({
+                    'epoch': r * prev_cycles + k,
+                    'model_state_dict': net.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': test_flow2_EPEs.avg,
+                }, "./" + "epoch_" + str(r * prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg))
