@@ -164,7 +164,7 @@ if __name__ == '__main__':
                     test_losses.update(loss.data.item(), inputs.size(0))
                     test_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
-                    if j % 10 == 0:
+                    if j % 2 == 0:
                         #print('Epoch: [{0}][{1}]\t'
                         #            'Loss {loss.val:.3f} ({loss.avg:.3f})\t'
                         #            'EPE {flow2_EPE.val:.3f} ({flow2_EPE.avg:.3f})\t'.format(
