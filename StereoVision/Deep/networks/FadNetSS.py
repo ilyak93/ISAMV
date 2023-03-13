@@ -44,7 +44,8 @@ class VONet(nn.Module):
         self.flowPoseNet = FlowPoseNet()
 
     def forward(self, x):
-        output_net1, output_net2 = self.flowNet(x)
-        pose = self.flowPoseNet(output_net2[0])
+        output_net1, output_net2 = self.flowNet(x) #with intrinsics should be x[0:2]
+        #flow_input = torch.cat((flow, x[2]), dim=1) add parametrized intrinsics
+        #pose = self.flowPoseNet(output_net2[0])
 
-        return output_net1, output_net2, pose
+        return output_net1, output_net2#, pose
