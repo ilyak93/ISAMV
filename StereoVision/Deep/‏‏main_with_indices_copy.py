@@ -39,15 +39,15 @@ if __name__ == '__main__':
 
 
     dataset = CustomImageDataset(
-        img_dir="C:/dataset/small_lrdd/"
+        img_dir="C:/dataset/first_300_no_RTcrop/"
     )
-    test_size = 50
+    test_size = len(dataset) // 5
     lengths = [len(dataset) - test_size, test_size]
     train_set, val_set = torch.utils.data.random_split(dataset, lengths)
 
     from torch.utils.data import DataLoader
 
-    batch_size = 4
+    batch_size = 2
     train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4)
     test_dataloader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=4)
 
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr,
                                  betas=(momentum, beta), amsgrad=True)
     decayRate = 0.98
-    #lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 
     train_losses = AverageMeter()
     train_flow2_EPEs = AverageMeter()
@@ -80,20 +80,42 @@ if __name__ == '__main__':
     i = 0
     j = 0
     cycles = 2
-    rows = 512
-    cols = 640
+    rows = 768
+    cols = 1280
 
     max_uint16 = pow(2, 16)
 
     previous_EPE = float(max_uint16)
 
     prev_cycles = 0
+    epoch = 0
+
+    start_opt_scheduler = 600
+
+    load_model = False
+    if load_model:
+        PATH = '/runs_finished/Mar15_09-25-46_VISTA-PC100/epoch_584_loss_2.223132038116455'
+        checkpoint = torch.load(PATH)
+        net.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        i = 54620
+        j = 11260
+        startRound = 3
+        prev_cycles = sum(FADNet_loss_config["epoches"][:startRound])
+        epoch = epoch - prev_cycles
 
     for r in range(startRound, len(FADNet_loss_config["epoches"])):
         cycles = FADNet_loss_config["epoches"][r]
-        for k in range(cycles):
+        for k in range(epoch, cycles):
             net.train()
             for [left_img, right_img], [target_disp, depths] in train_dataloader:
+                left_img_expanded = torch.zeros(left_img.size(0), rows, left_img.size(2))
+                left_img_expanded[:,0:720, :] = left_img
+                left_img = left_img_expanded
+                right_img_expanded = torch.zeros(left_img.size(0), rows, left_img.size(2))
+                right_img_expanded[:, 0:720, :] = right_img
+                right_img = right_img_expanded
                 left_img = left_img.unsqueeze(dim=1) / max_uint16
                 right_img = right_img.unsqueeze(dim=1) / max_uint16
                 actual_batch_size = left_img.size(0)
@@ -105,6 +127,9 @@ if __name__ == '__main__':
                 right_img_with_indices = torch.cat([right_img, row_indices_feature, cols_indices_feature], dim=1)
 
                 # target_disp = torch.sqrt(target_disp.unsqueeze(dim=1)).cuda()
+                depths_expanded = torch.zeros(depths.size(0), rows, depths.size(2))
+                depths_expanded[:, 0:720, :] = depths
+                depths = depths_expanded
                 target_dis = depths.unsqueeze(dim=1).cuda() / 1000
                 inputs = torch.cat((left_img_with_indices, right_img_with_indices), dim=1).cuda()
                 output_net1, output_net2 = net(inputs)
@@ -136,7 +161,8 @@ if __name__ == '__main__':
             writer.add_scalar("train/epoch/loss", train_losses.avg, prev_cycles + k)
             writer.add_scalar("train/epoch/EPE", train_flow2_EPEs.avg, prev_cycles + k)
 
-            # lr_scheduler.step()
+            if prev_cycles + k > start_opt_scheduler:
+                lr_scheduler.step()
 
             test_losses = AverageMeter()
             test_flow2_EPEs = AverageMeter()
@@ -145,6 +171,14 @@ if __name__ == '__main__':
                 test_flow2_EPEs = AverageMeter()
                 net.eval()
                 for [left_img, right_img], [target_disp, depths] in test_dataloader:
+
+                    left_img_expanded = torch.zeros(left_img.size(0), rows, left_img.size(2))
+                    #left_img_expanded[:, 0:720, :] = left_img
+                    left_img = left_img_expanded
+                    right_img_expanded = torch.zeros(left_img.size(0), rows, left_img.size(2))
+                    #right_img_expanded[:, 0:720, :] = right_img
+                    right_img = right_img_expanded
+
                     left_img = left_img.unsqueeze(dim=1) / max_uint16
                     right_img = right_img.unsqueeze(dim=1) / max_uint16
 
@@ -157,6 +191,9 @@ if __name__ == '__main__':
                     right_img_with_indices = torch.cat([right_img, row_indices_feature, cols_indices_feature], dim=1)
 
                     # target_disp = torch.sqrt(target_disp.unsqueeze(dim=1)).cuda()
+                    depths_expanded = torch.zeros(depths.size(0), rows, depths.size(2))
+                    depths_expanded[:, 0:720, :] = depths
+                    depths = depths_expanded
                     target_dis = depths.unsqueeze(dim=1).cuda() / 1000
                     inputs = torch.cat((left_img_with_indices, right_img_with_indices), dim=1).cuda()
                     output_net1, output_net2 = net(inputs)
@@ -184,8 +221,10 @@ if __name__ == '__main__':
                                                         output_net2[0].cpu() / 256)),
                                              0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
-                        writer.add_image(tag='Test_images/image_' + str(j % 13),
-                                         img_tensor=grid, global_step=prev_cycles + k,
+                        writer.add_image(tag='Test_images/image_' +
+                                              str(j % (test_size // 2 + 1)),
+                                         img_tensor=grid,
+                                         global_step=prev_cycles + k,
                                          dataformats='CHW')
                     j = j + 1
 
