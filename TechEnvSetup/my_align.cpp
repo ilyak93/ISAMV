@@ -17,10 +17,32 @@ int H = 720;
 
 using namespace std;
 
+std::vector <std::string> read_directory( const std::string& path = std::string() )
+{
+    std::vector <std::string> result;
+    dirent* de;
+    DIR* dp;
+    errno = 0;
+    dp = opendir( path.empty() ? "." : path.c_str() );
+    if (dp)
+    {
+        while (true)
+        {
+            errno = 0;
+            de = readdir( dp );
+            if (de == NULL) break;
+            result.push_back( std::string( de->d_name ) );
+        }
+        closedir( dp );
+        std::sort( result.begin(), result.end() );
+    }
+    return result;
+}
+
 
 int main() {
 
-    std::ifstream infile("G:/Vista_project/fusion/intrinsics_extrinsics.txt");
+    std::ifstream infile("E:/Vista_project2/21/intrinsics_extrinsics.txt");
 
     std::string line;
     vector<string> depth;
@@ -107,22 +129,14 @@ int main() {
 
     //inject the images
 
-    DIR *dir;
-    struct dirent *ent;
-    struct dirent ent_depth;
-    struct dirent ent_color;
-    string path("G:/Vista_project/fusion/1/");
-    dir = opendir((path+string("/sync/")).c_str());
-    assert(dir != NULL);
+    string path("E:/Vista_project2/21/");
 
-    while ((ent = readdir (dir)) != NULL) {
-        if(string(ent->d_name).compare("..") == 0 || string(ent->d_name).compare(".") == 0)
-            continue;
-        ent_color = *ent;
-        ent = readdir(dir);
-        ent_depth = *ent;
-        string color_image_path = path + string("/sync/") + string(ent_color.d_name);
-        string depth_image_path = path + string("/sync/") + string(ent_depth.d_name);
+    vector<string> files_list = read_directory((path+string("/rs/")).c_str());
+
+    for(int i = 2; i < files_list.size(); i+=2) {
+
+        string color_image_path = path + string("/rs/") + files_list[i];
+        string depth_image_path = path + string("/rs/") + files_list[i+1];
         color_image = cv::imread(color_image_path.c_str(), cv::IMREAD_COLOR);
         depth_image = cv::imread(depth_image_path.c_str(),cv::IMREAD_UNCHANGED);
         /*
@@ -154,12 +168,12 @@ int main() {
             rs2::frame color_frame = fs.get_color_frame();
 
             cv::Mat aligned_image(720, 1280, CV_16UC1, (void *) (depth_frame.get_data()), 2 * 1280);
-            cv::imwrite(path + "/aligned_rs/" + string(ent_depth.d_name), aligned_image);
+            cv::imwrite(path + "/aligned_rs/" +  files_list[i+1], aligned_image);
             cv::Mat aligned_image2(720, 1280, CV_8UC3, (void *) (color_frame.get_data()), 3 * 1280);
-            cv::imwrite(path + "/aligned_rs/" + string(ent_color.d_name), aligned_image2);
+            cv::imwrite(path + "/aligned_rs/" +  files_list[i], aligned_image2);
         }
         idx++;
     }
-    closedir (dir);
+
     return 0;
 }
