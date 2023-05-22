@@ -46,8 +46,8 @@ def winsort(data):
 
 
 
-for g in range(12,13):
-    g_path = "F:/Vista_project2/" + str(g)
+for g in range(21,22):
+    g_path = "F:/Vista_project2/" + str(g) + "_ready"
     left_path = g_path + "/left/"
     right_path = g_path + "/right/"
     rs_path = g_path + "/rs/"
@@ -71,14 +71,14 @@ for g in range(12,13):
     valid_rs_files = [rs_files[i] for i in closest_indices]
     files_to_delete = [file for file in rs_files if file not in valid_rs_files and "color" in file]
     #closest_indices2 = find_closest_by_ts(right_tc_files, rs_files)
-    '''
+
     for file_to_delete in files_to_delete:
         file_name = file_to_delete[:-9]
         color_file = file_to_delete
         depth_file = file_name + "depth.png"
         os.remove(rs_path+color_file)
         os.remove(rs_path + depth_file)
-    '''
+
     tc_len = len(left_tc_files)
     for i in range(tc_len):
         tc1_np = np.round(cv2.imread(left_path + left_tc_files[i], cv2.IMREAD_UNCHANGED) / 256).astype(np.uint8)
