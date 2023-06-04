@@ -42,7 +42,7 @@ std::vector <std::string> read_directory( const std::string& path = std::string(
 
 int main() {
 
-    std::ifstream infile("E:/Vista_project2/21/intrinsics_extrinsics.txt");
+    std::ifstream infile("F:/Vista_project2/21_ready/intrinsics_extrinsics.txt");
 
     std::string line;
     vector<string> depth;
@@ -129,14 +129,14 @@ int main() {
 
     //inject the images
 
-    string path("E:/Vista_project2/21/");
+    string path("F:/Vista_project2/21_ready/");
 
-    vector<string> files_list = read_directory((path+string("/rs/")).c_str());
+    vector<string> files_list = read_directory((path+string("/sync/")).c_str());
 
-    for(int i = 2; i < files_list.size(); i+=2) {
+    for(int i = 0; i < files_list.size(); i+=2) {
 
-        string color_image_path = path + string("/rs/") + files_list[i];
-        string depth_image_path = path + string("/rs/") + files_list[i+1];
+        string color_image_path = path + string("/sync/") + files_list[i];
+        string depth_image_path = path + string("/sync/") + files_list[i+1];
         color_image = cv::imread(color_image_path.c_str(), cv::IMREAD_COLOR);
         depth_image = cv::imread(depth_image_path.c_str(),cv::IMREAD_UNCHANGED);
         /*
@@ -167,13 +167,13 @@ int main() {
             rs2::frame depth_frame = fs.get_depth_frame();
             rs2::frame color_frame = fs.get_color_frame();
 
-            cv::Mat aligned_image(720, 1280, CV_16UC1, (void *) (depth_frame.get_data()), 2 * 1280);
-            cv::imwrite(path + "/aligned_rs/" +  files_list[i+1], aligned_image);
+            //cv::Mat aligned_image(720, 1280, CV_16UC1, (void *) (depth_frame.get_data()), 2 * 1280);
+            //cv::imwrite(path + "/aligned_rs/" +  files_list[i+1], aligned_image);
             cv::Mat aligned_image2(720, 1280, CV_8UC3, (void *) (color_frame.get_data()), 3 * 1280);
             cv::imwrite(path + "/aligned_rs/" +  files_list[i], aligned_image2);
         }
         idx++;
     }
-
+    
     return 0;
 }
