@@ -26,18 +26,42 @@ def winsort(data):
 #np_depth_im = cv2.imread("G:/Vista_project/finish_deep/aligned_rs/650depth.png", cv2.IMREAD_ANYDEPTH)
 #np_left_im = cv2.imread("G:/Vista_project/finish_deep/left_resized/650color.png", cv2.IMREAD_ANYDEPTH)
 
+quartet_folder_name = "sync_color_to_depth"
 
-dataset_num = 1
-left_path = "E:/raw_data/self-moving_outside/" + str(dataset_num) + "/left/"
-left_th_files = os.listdir(left_path)
-left_th_files = winsort(left_th_files)
+dataset_num = 21
+gen_path = "F:/Vista_project2/"
+all_path = gen_path + str(dataset_num) + "_ready/" + quartet_folder_name + "/"
+all_files = os.listdir(all_path)
+all_files = winsort(all_files)
 
-file_num = 5
-file_num = file_num - 1
-left_file_path = "E:/raw_data/self-moving_outside/" + str(dataset_num) + "/left/" + left_th_files[file_num]
-np_color_im = cv2.imread("E:/raw_data/self-moving_outside/1/aligned_rs/5color.png", cv2.IMREAD_COLOR)
+# file num 62
+# file num 726
+# TODO: there are still not synced frames (singles)
+# TODO: bad sync at fast rotations or fast velocity/accelerations
+file_num = 2
+files = 4
+#file_num = file_num - 1
+thermal_file_path = gen_path + str(dataset_num) + "_ready/" + \
+                    quartet_folder_name + "/" + \
+                    all_files[file_num * files + 2]
+if "left" in thermal_file_path:
+    left_file_path = thermal_file_path
+    right_file_path = gen_path + str(dataset_num) + "_ready/" + \
+                      quartet_folder_name + "/" + all_files[file_num * files + 3]
+else:
+    right_file_path = thermal_file_path
+    left_file_path = gen_path + str(dataset_num) + "_ready/" + \
+                     quartet_folder_name + "/" + all_files[file_num * files + 3]
+
+color_file_path = gen_path + str(dataset_num) + \
+                  "_ready/" + quartet_folder_name + "/" + \
+                  all_files[file_num * files]
+depth_file_path = gen_path + str(dataset_num) + "_ready/" + \
+                  quartet_folder_name + "/" + all_files[file_num * files + 1]
+
+np_color_im = cv2.imread(color_file_path, cv2.IMREAD_COLOR)
 np_color_im = cv2.cvtColor(np_color_im, cv2.COLOR_BGR2RGB)
-np_depth_im = cv2.imread("E:/raw_data/self-moving_outside/1/aligned_rs/5depth.png", cv2.IMREAD_ANYDEPTH)
+np_depth_im = cv2.imread(depth_file_path, cv2.IMREAD_ANYDEPTH)
 np_left_im = cv2.imread(left_file_path, cv2.IMREAD_ANYDEPTH)
 
 color_raw = o3d.geometry.Image(np_color_im)
@@ -178,8 +202,10 @@ for i in range(l):
 point_u, point_v = real_indices.transpose()
 point_xyz = xyz_matrix[point_u, point_v].transpose()
 point_color = color_image[point_u, point_v]
+point_depth = depth_image[point_u, point_v]
 
-therm_focals = [1008.8578238167438196598189451667,	1020.9726220290907682227917520318]
+#therm_focals = [1008.8578238167438196598189451667,	1020.9726220290907682227917520318]
+therm_focals = [813.8578238167438196598189451667,	815.9726220290907682227917520318] # hor, ver
 therm_centers = [319.690452842080,	200.489004453523]
 therm_distortion_coefs = [3.26801409578410, -296.593697284903, 0, 0, 16968.6805606598]
 
@@ -205,8 +231,8 @@ t = np.array([-121.952452666493, 189.727110138437, -813.867721109518])
 def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np.eye, t = np.ones((3,1))):
     #distortion_coefs: k1,k2,p1,p2,k3, focals: fx,fy, centers same.
     xyz = point_xyz * 1000
-    t[0] = t[0] + 90   # + move left camera angle changes right
-    t[1] = t[1] - 350
+    t[0] = t[0] + 200# + move left camera angle changes right
+    t[1] = t[1] - 300 # + move up camera
     #t[2] = t[2] + 150
     rotated_translated_xyz = R @ xyz + t.reshape(3,1)
 
@@ -221,8 +247,8 @@ def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np
         x = dx;
         y = dy;
 
-    pixel_u = x * focals[0] + centers[0] + 18.5 # + is right
-    pixel_v = y * focals[1] + centers[1] + 45# + is down
+    pixel_u = x * focals[0] + centers[0] - 7.5# + is right (if camera moved left here it should brought left and vice versa)
+    pixel_v = y * focals[1] + centers[1] + 22  # + is down (if camera moved down here it should brought down and vice versa)
     pixel_u[(pixel_u <= 0) | (pixel_u > 1279.5)] = 0
     pixel_v[(pixel_v <= 0) | (pixel_v > 719.5)] = 0
 
@@ -233,16 +259,31 @@ returned_u, returned_v = project(point_xyz, therm_focals, therm_centers, rs_dist
 igul_u, igul_v = np.round(returned_u).astype(int), np.round(returned_v).astype(int)
 new_img[igul_u, igul_v, :] = point_color
 
-imshow(np_color_im)
-show()
-imshow(new_img)
-show()
+projected_depth = np.zeros_like(depth_image)
+projected_depth[igul_u, igul_v] = point_depth
+
+
+#imshow(np_color_im)
+#show()
+#imshow(new_img)
+#show()
+from PIL import Image
+im = Image.fromarray(new_img.astype(np.uint8))
+im.save("nd.png", format="PNG")
 new_left_img = np.zeros_like(np_depth_im, dtype=np.uint16)
 new_left_img[0:512, 0:640] = np_left_im.astype(np.uint16)
-imshow(new_left_img)
-show()
-imshow(color_image_projected_on_depth)
-show()
+#imshow(new_left_img)
+#show()
+from PIL import Image
+im = Image.fromarray(new_left_img)
+im.save("nt.png", format="PNG")
+#imshow(color_image_projected_on_depth)
+#show()
+#imshow(projected_depth)
+#show()
+from PIL import Image
+im = Image.fromarray(projected_depth.astype(np.uint16))
+im.save("ndd.tif")
 print()
 
 
