@@ -28,6 +28,7 @@ def winsort(data):
 
 quartet_folder_name = "sync_color_to_depth"
 
+
 dataset_num = 21
 gen_path = "F:/Vista_project2/"
 all_path = gen_path + str(dataset_num) + "_ready/" + quartet_folder_name + "/"
@@ -38,13 +39,13 @@ all_files = winsort(all_files)
 # file num 726
 # TODO: there are still not synced frames (singles)
 # TODO: bad sync at fast rotations or fast velocity/accelerations
-file_num = 2
+file_num = 197
 files = 4
 #file_num = file_num - 1
 thermal_file_path = gen_path + str(dataset_num) + "_ready/" + \
                     quartet_folder_name + "/" + \
                     all_files[file_num * files + 2]
-if "left" in thermal_file_path:
+if "_l" in thermal_file_path:
     left_file_path = thermal_file_path
     right_file_path = gen_path + str(dataset_num) + "_ready/" + \
                       quartet_folder_name + "/" + all_files[file_num * files + 3]
@@ -231,7 +232,7 @@ t = np.array([-121.952452666493, 189.727110138437, -813.867721109518])
 def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np.eye, t = np.ones((3,1))):
     #distortion_coefs: k1,k2,p1,p2,k3, focals: fx,fy, centers same.
     xyz = point_xyz * 1000
-    t[0] = t[0] + 200# + move left camera angle changes right
+    t[0] = t[0] + 150# + move left camera angle changes right
     t[1] = t[1] - 300 # + move up camera
     #t[2] = t[2] + 150
     rotated_translated_xyz = R @ xyz + t.reshape(3,1)
@@ -247,7 +248,7 @@ def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np
         x = dx;
         y = dy;
 
-    pixel_u = x * focals[0] + centers[0] - 7.5# + is right (if camera moved left here it should brought left and vice versa)
+    pixel_u = x * focals[0] + centers[0] - 5# + is right (if camera moved left here it should brought left and vice versa)
     pixel_v = y * focals[1] + centers[1] + 22  # + is down (if camera moved down here it should brought down and vice versa)
     pixel_u[(pixel_u <= 0) | (pixel_u > 1279.5)] = 0
     pixel_v[(pixel_v <= 0) | (pixel_v > 719.5)] = 0
