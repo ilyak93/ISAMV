@@ -28,7 +28,6 @@ def winsort(data):
 
 quartet_folder_name = "sync_color_to_depth"
 
-
 dataset_num = 21
 gen_path = "F:/Vista_project2/"
 all_path = gen_path + str(dataset_num) + "_ready/" + quartet_folder_name + "/"
@@ -45,7 +44,7 @@ files = 4
 thermal_file_path = gen_path + str(dataset_num) + "_ready/" + \
                     quartet_folder_name + "/" + \
                     all_files[file_num * files + 2]
-if "_l" in thermal_file_path:
+if "left" in thermal_file_path:
     left_file_path = thermal_file_path
     right_file_path = gen_path + str(dataset_num) + "_ready/" + \
                       quartet_folder_name + "/" + all_files[file_num * files + 3]
@@ -63,7 +62,7 @@ depth_file_path = gen_path + str(dataset_num) + "_ready/" + \
 np_color_im = cv2.imread(color_file_path, cv2.IMREAD_COLOR)
 np_color_im = cv2.cvtColor(np_color_im, cv2.COLOR_BGR2RGB)
 np_depth_im = cv2.imread(depth_file_path, cv2.IMREAD_ANYDEPTH)
-np_left_im = cv2.imread(left_file_path, cv2.IMREAD_ANYDEPTH)
+np_right_im = cv2.imread(right_file_path, cv2.IMREAD_ANYDEPTH)
 
 color_raw = o3d.geometry.Image(np_color_im)
 depth_raw = o3d.geometry.Image(np_depth_im)
@@ -232,7 +231,7 @@ t = np.array([-121.952452666493, 189.727110138437, -813.867721109518])
 def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np.eye, t = np.ones((3,1))):
     #distortion_coefs: k1,k2,p1,p2,k3, focals: fx,fy, centers same.
     xyz = point_xyz * 1000
-    t[0] = t[0] + 150# + move left camera angle changes right
+    t[0] = t[0] - 50# + move left camera angle changes right
     t[1] = t[1] - 300 # + move up camera
     #t[2] = t[2] + 150
     rotated_translated_xyz = R @ xyz + t.reshape(3,1)
@@ -248,8 +247,8 @@ def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np
         x = dx;
         y = dy;
 
-    pixel_u = x * focals[0] + centers[0] - 5# + is right (if camera moved left here it should brought left and vice versa)
-    pixel_v = y * focals[1] + centers[1] + 22  # + is down (if camera moved down here it should brought down and vice versa)
+    pixel_u = x * focals[0] + centers[0] - 32# + is right (if camera moved left here it should brought left and vice versa)
+    pixel_v = y * focals[1] + centers[1] + 21  # + is down (if camera moved down here it should brought down and vice versa)
     pixel_u[(pixel_u <= 0) | (pixel_u > 1279.5)] = 0
     pixel_v[(pixel_v <= 0) | (pixel_v > 719.5)] = 0
 
@@ -272,7 +271,7 @@ from PIL import Image
 im = Image.fromarray(new_img.astype(np.uint8))
 im.save("nd.png", format="PNG")
 new_left_img = np.zeros_like(np_depth_im, dtype=np.uint16)
-new_left_img[0:512, 0:640] = np_left_im.astype(np.uint16)
+new_left_img[0:512, 0:640] = np_right_im.astype(np.uint16)
 #imshow(new_left_img)
 #show()
 from PIL import Image
