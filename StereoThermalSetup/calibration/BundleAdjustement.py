@@ -1,8 +1,9 @@
+import time
 import urllib
 import bz2
 import os
 import numpy as np
-
+from scipy.optimize import least_squares
 
 BASE_URL = "http://grail.cs.washington.edu/projects/bal/data/ladybug/"
 FILE_NAME = "problem-49-7776-pre.txt.bz2"
@@ -111,6 +112,39 @@ def bundle_adjustment_sparsity(n_cameras, n_points, camera_indices, point_indice
 
 
 import matplotlib.pyplot as plt
+'''
+x0 = np.hstack((camera_params.ravel(), points_3d.ravel()))
+f0 = fun(x0, n_cameras, n_points, camera_indices, point_indices, points_2d)
+plt.plot(f0)
+
+A = bundle_adjustment_sparsity(n_cameras, n_points, camera_indices, point_indices)
+
+t0 = time.time()
+res = least_squares(fun, x0, jac_sparsity=A, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
+                    args=(n_cameras, n_points, camera_indices, point_indices, points_2d))
+t1 = time.time()
+
+print("Optimization took {0:.0f} seconds".format(t1 - t0))
+
+plt.plot(res.fun)
+'''
+
+points_2d = np.load("points_2d.npz")["arr_0"]
+camera_indices = np.load("camera_indices.npz")["arr_0"]
+point_indices = np.load("point_indices.npz")["arr_0"]
+points_3d = np.load("points_3d.npz")["arr_0"]
+camera_params = camera_params[0:2, :]
+
+n_cameras = camera_params.shape[0]
+n_points = points_3d.shape[0]
+
+n = 9 * n_cameras + 3 * n_points
+m = 2 * points_2d.shape[0]
+
+print("n_cameras: {}".format(n_cameras))
+print("n_points: {}".format(n_points))
+print("Total number of parameters: {}".format(n))
+print("Total number of residuals: {}".format(m))
 
 x0 = np.hstack((camera_params.ravel(), points_3d.ravel()))
 f0 = fun(x0, n_cameras, n_points, camera_indices, point_indices, points_2d)
@@ -126,4 +160,21 @@ t1 = time.time()
 print("Optimization took {0:.0f} seconds".format(t1 - t0))
 
 plt.plot(res.fun)
+
+plt.show()
+
+def prettylist(l):
+    return '[%s]' % ', '.join("%4.1e" % f for f in l)
+
+print('Before:')
+print('cam0: {}'.format(prettylist(x0[0:9])))
+print('cam1: {}'.format(prettylist(x0[9:18])))
+
+print('After:')
+print('cam0: {}'.format(prettylist(res.x[0:9])))
+print('cam1: {}'.format(prettylist(res.x[9:18])))
+
+
+
+
 
