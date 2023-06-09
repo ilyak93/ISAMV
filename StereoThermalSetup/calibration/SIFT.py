@@ -36,8 +36,6 @@ ax[0, 0].axis('off')
 ax[0, 0].set_title("Original Image vs. Flipped Image\n"
                    "(all keypoints and matches)")
 
-
-
 matches12_par = matches12[abs(keypoints1[matches12[:, 0]][:, 0] - keypoints2[matches12[:, 1]][:, 0]) < 10]
 
 plot_matches(ax[0, 1], img1, img2, keypoints1, keypoints2, matches12_par[::5],
@@ -47,6 +45,19 @@ ax[0, 1].set_title("Original Image vs. Flipped Image\n"
                    "(subset of matches for visibility)")
 
 
-
 plt.tight_layout()
 plt.show()
+
+# create data for BA from SIFT matches
+
+point2d_first_view = keypoints1[matches12_par[:, 0]]
+point2d_second_view = keypoints2[matches12_par[:, 1]]
+
+points_2d = np.concatenate((point2d_first_view, point2d_second_view),
+                           axis=0).astype(np.uint16)
+camera_indices = np.concatenate((np.zeros(matches12_par.shape[0]),
+                                 np.zeros(matches12_par.shape[0]) + 1),
+                                axis=0).astype(np.uint16)
+point_indices = np.concatenate((np.array(list(range(matches12_par.shape[0]))),
+                                np.array(list(range(matches12_par.shape[0])))),
+                               axis=0).astype(np.uint16)
