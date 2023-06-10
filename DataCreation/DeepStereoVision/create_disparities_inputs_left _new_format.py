@@ -26,7 +26,7 @@ def winsort(data):
 #np_depth_im = cv2.imread("G:/Vista_project/finish_deep/aligned_rs/650depth.png", cv2.IMREAD_ANYDEPTH)
 #np_left_im = cv2.imread("G:/Vista_project/finish_deep/left_resized/650color.png", cv2.IMREAD_ANYDEPTH)
 
-quartet_folder_name = "sync_color_to_depth"
+quartet_folder_name = "sync"
 
 
 dataset_num = 21
@@ -35,23 +35,25 @@ all_path = gen_path + str(dataset_num) + "_ready/" + quartet_folder_name + "/"
 all_files = os.listdir(all_path)
 all_files = winsort(all_files)
 
-# file num 62
-# file num 726
+# file num 42
+# file num 2825
+# file num 3234
+# file num 3809
 # TODO: there are still not synced frames (singles)
 # TODO: bad sync at fast rotations or fast velocity/accelerations
-file_num = 197
+file_num = 3341
 files = 4
 #file_num = file_num - 1
 thermal_file_path = gen_path + str(dataset_num) + "_ready/" + \
                     quartet_folder_name + "/" + \
                     all_files[file_num * files + 2]
-if "_l" in thermal_file_path:
-    left_file_path = thermal_file_path
-    right_file_path = gen_path + str(dataset_num) + "_ready/" + \
-                      quartet_folder_name + "/" + all_files[file_num * files + 3]
-else:
+if "right" in thermal_file_path:
     right_file_path = thermal_file_path
     left_file_path = gen_path + str(dataset_num) + "_ready/" + \
+                      quartet_folder_name + "/" + all_files[file_num * files + 3]
+else:
+    left_file_path = thermal_file_path
+    right_file_path = gen_path + str(dataset_num) + "_ready/" + \
                      quartet_folder_name + "/" + all_files[file_num * files + 3]
 
 color_file_path = gen_path + str(dataset_num) + \
@@ -206,7 +208,7 @@ point_color = color_image[point_u, point_v]
 point_depth = depth_image[point_u, point_v]
 
 #therm_focals = [1008.8578238167438196598189451667,	1020.9726220290907682227917520318]
-therm_focals = [813.8578238167438196598189451667,	815.9726220290907682227917520318] # hor, ver
+therm_focals = [835.8578238167438196598189451667,	815.9726220290907682227917520318] # hor, ver
 therm_centers = [319.690452842080,	200.489004453523]
 therm_distortion_coefs = [3.26801409578410, -296.593697284903, 0, 0, 16968.6805606598]
 
@@ -229,11 +231,11 @@ R = np.array([
 t = np.array([-121.952452666493, 189.727110138437, -813.867721109518])
 
 
-def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np.eye, t = np.ones((3,1))):
+def project_close(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np.eye, t = np.ones((3,1))):
     #distortion_coefs: k1,k2,p1,p2,k3, focals: fx,fy, centers same.
     xyz = point_xyz * 1000
-    t[0] = t[0] + 150# + move left camera angle changes right
-    t[1] = t[1] - 300 # + move up camera
+    t[0] = t[0] - 50# + move left camera angle changes left
+    t[1] = t[1] - 350 # + move up camera
     #t[2] = t[2] + 150
     rotated_translated_xyz = R @ xyz + t.reshape(3,1)
 
@@ -248,20 +250,56 @@ def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np
         x = dx;
         y = dy;
 
-    pixel_u = x * focals[0] + centers[0] - 5# + is right (if camera moved left here it should brought left and vice versa)
-    pixel_v = y * focals[1] + centers[1] + 22  # + is down (if camera moved down here it should brought down and vice versa)
+    pixel_u = x * focals[0] + centers[0] + 12.5 # + is right (if camera moved left here it should brought left and vice versa)
+    pixel_v = y * focals[1] + centers[1] + 24  # + is down (if camera moved down here it should brought down and vice versa)
     pixel_u[(pixel_u <= 0) | (pixel_u > 1279.5)] = 0
     pixel_v[(pixel_v <= 0) | (pixel_v > 719.5)] = 0
 
     return pixel_v, pixel_u
 
 
-returned_u, returned_v = project(point_xyz, therm_focals, therm_centers, rs_distortion_coefs, False, np.eye(3), t)
+returned_u, returned_v = project_close(point_xyz, therm_focals, therm_centers, rs_distortion_coefs, False, np.eye(3), t)
 igul_u, igul_v = np.round(returned_u).astype(int), np.round(returned_v).astype(int)
 new_img[igul_u, igul_v, :] = point_color
 
 projected_depth = np.zeros_like(depth_image)
 projected_depth[igul_u, igul_v] = point_depth
+
+t = np.array([-121.952452666493, 189.727110138437, -813.867721109518])
+def project_far(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np.eye, t = np.ones((3,1))):
+    #distortion_coefs: k1,k2,p1,p2,k3, focals: fx,fy, centers same.
+    xyz = point_xyz * 1000
+    t[0] = t[0] # + move left camera angle changes left
+    t[1] = t[1] - 350 # + move up camera
+    #t[2] = t[2] + 150
+    rotated_translated_xyz = R @ xyz + t.reshape(3,1)
+
+    x, y = rotated_translated_xyz[0, :] / rotated_translated_xyz[2, :], rotated_translated_xyz[1, :] / rotated_translated_xyz[2, :]
+
+    if use_dist:
+        r2 = x * x + y * y;
+        f = 1 + distortion_coefs[0] * r2 + distortion_coefs[1] * r2 * r2 + distortion_coefs[4] * r2 * r2 * r2;
+        x, y = x * f, y * f
+        dx = x + 2 * distortion_coefs[1] * x * y + distortion_coefs[3] * (r2 + 2 * x * x)
+        dy = y + 2 * distortion_coefs[3] * x * y + distortion_coefs[2] * (r2 + 2 * y * y)
+        x = dx;
+        y = dy;
+
+    pixel_u = x * focals[0] + centers[0]  # + is right (if camera moved left here it should brought left and vice versa)
+    pixel_v = y * focals[1] + centers[1] + 24  # + is down (if camera moved down here it should brought down and vice versa)
+    pixel_u[(pixel_u <= 0) | (pixel_u > 1279.5)] = 0
+    pixel_v[(pixel_v <= 0) | (pixel_v > 719.5)] = 0
+
+    return pixel_v, pixel_u
+
+
+returned_u, returned_v = project_far(point_xyz, therm_focals, therm_centers, rs_distortion_coefs, False, np.eye(3), t)
+igul_u, igul_v = np.round(returned_u).astype(int), np.round(returned_v).astype(int)
+new_img2 = np.zeros((720, 1280, 3), dtype=np.int)
+new_img2[igul_u, igul_v, :] = point_color
+
+projected_depth2 = np.zeros_like(depth_image)
+projected_depth2[igul_u, igul_v] = point_depth
 
 
 #imshow(np_color_im)
@@ -270,7 +308,11 @@ projected_depth[igul_u, igul_v] = point_depth
 #show()
 from PIL import Image
 im = Image.fromarray(new_img.astype(np.uint8))
-im.save("nd.png", format="PNG")
+im.save("nd_close.png", format="PNG")
+
+im = Image.fromarray(new_img2.astype(np.uint8))
+im.save("nd_far.png", format="PNG")
+
 new_left_img = np.zeros_like(np_depth_im, dtype=np.uint16)
 new_left_img[0:512, 0:640] = np_left_im.astype(np.uint16)
 #imshow(new_left_img)
@@ -286,6 +328,16 @@ from PIL import Image
 im = Image.fromarray(projected_depth.astype(np.uint16))
 im.save("ndd.tif")
 print()
+
+im1 = new_img
+idx1 = projected_depth2 > 10000
+im1[idx1] = [0,0,0]
+
+im2 = new_img2
+idx2 = projected_depth2 > 10000
+im1[idx1] += im2[idx2]
+im1 = Image.fromarray(im1.astype(np.uint8))
+im1.save("nd_combo.png", format="PNG")
 
 
 
