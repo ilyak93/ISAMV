@@ -61,3 +61,8 @@ camera_indices = np.concatenate((np.zeros(matches12_par.shape[0]),
 point_indices = np.concatenate((np.array(list(range(matches12_par.shape[0]))),
                                 np.array(list(range(matches12_par.shape[0])))),
                                axis=0).astype(np.uint16)
+
+
+np.savez("points_2d.npz", points_2d)
+np.savez("camera_indices.npz", camera_indices)
+np.savez("point_indices.npz", point_indices)
