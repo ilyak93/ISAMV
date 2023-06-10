@@ -87,6 +87,25 @@ def project_a(points, camera_params):
     return points_proj
 
 
+
+
+def my_project_a(points, camera_params):
+    """Convert 3-D points to 2-D by projecting onto images."""
+    #points_proj = rotate(points, camera_params[:, :3])
+    points_proj = points
+    points_proj += camera_params[:, 4:7]
+    points_proj = -points_proj[:, :2] / points_proj[:, 2, np.newaxis]
+    fx = camera_params[:, 0]
+    fy = camera_params[:, 1]
+    cpx = camera_params[:, 2]
+    cpy = camera_params[:, 3]
+    points_proj[:, 0] *= fx
+    points_proj[:, 0] += cpx
+    points_proj[:, 1] *= fy
+    points_proj[:, 0] += cpy
+    return points_proj
+
+
 def fun(params, n_cameras, n_points, camera_indices, point_indices, points_2d):
     """Compute residuals.
 
@@ -94,7 +113,7 @@ def fun(params, n_cameras, n_points, camera_indices, point_indices, points_2d):
     """
     camera_params = params[:n_cameras * 9].reshape((n_cameras, 9))
     points_3d = params[n_cameras * 9:].reshape((n_points, 3))
-    points_proj = project_a(points_3d[point_indices], camera_params[camera_indices])
+    points_proj = my_project_a(points_3d[point_indices], camera_params[camera_indices])
     return (points_proj - points_2d).ravel()
 
 from scipy.sparse import lil_matrix
@@ -140,7 +159,14 @@ camera_indices = np.load("camera_indices.npz")["arr_0"]
 point_indices = np.load("point_indices.npz")["arr_0"]
 points_3d = np.load("points_3d.npz")["arr_0"]
 camera_params = camera_params[0:2, :]
-camera_params[:, 6] = 250
+
+camera_params[:, 0] = 2100
+camera_params[:, 1] = 2100
+camera_params[:, 2] = 320
+camera_params[:, 3] = 200
+camera_params[:, 4] = 0
+camera_params[:, 5] = 0
+camera_params[:, 6] = -800
 
 n_cameras = camera_params.shape[0]
 n_points = points_3d.shape[0]
@@ -156,6 +182,7 @@ print("Total number of residuals: {}".format(m))
 x0 = np.hstack((camera_params.ravel(), points_3d.ravel()))
 f0 = fun(x0, n_cameras, n_points, camera_indices, point_indices, points_2d)
 plt.plot(f0)
+plt.show()
 
 A = bundle_adjustment_sparsity(n_cameras, n_points, camera_indices, point_indices)
 
@@ -402,17 +429,18 @@ X = (U - cx) * Z / fx
 Y = (V - cy) * Z / fy
 XYZ = np.stack((X, Y, Z), axis=-1)
 
-projected_to_thermal2 = project_a(XYZ.reshape(-1, 3),
+projected_to_thermal2 = my_project_a(XYZ.reshape(-1, 3),
                                   np.repeat(res.x[0:9].reshape(1, -1),
                                             640*512, axis=0)).reshape((512,640,2))
 
-projected_to_thermal2[projected_to_thermal2 < 0] = 0
+projected_to_thermal2[:,:, 0] += max(-projected_to_thermal2[:,:, 0].min(), 0)
+projected_to_thermal2[:,:, 1] += max(-projected_to_thermal2[:,:, 1].min(), 0)
 projected_to_thermal2 = projected_to_thermal2.astype(int)
 
-right_depth = np.zeros((512, 640))
+right_depth = np.zeros((1000, 1000))
 
-right_depth += XYZ[:, :, 2][projected_to_thermal2[:, :, 1],
-                            projected_to_thermal2[:, :, 0]]
+right_depth[projected_to_thermal2[:, :, 1],
+            projected_to_thermal2[:, :, 0]] = XYZ[:, :, 2]
 
 plt.imshow(right_depth)
 plt.show()
