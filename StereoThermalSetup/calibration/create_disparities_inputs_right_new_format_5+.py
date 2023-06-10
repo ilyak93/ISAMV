@@ -11,21 +11,73 @@ from ctypes import wintypes, windll
 from functools import cmp_to_key
 from PIL import Image
 
+import numpy as np
+
+def median_filter_handmode_1D(image, ksize):
+    # Create a Gaussian kernel
+
+    # Apply padding to the image
+    pad = ksize // 2
+    padded_image = np.zeros((image.shape[0] + pad * 2,
+                             image.shape[1] + pad * 2), dtype=np.float32)
+
+    padded_image[:, :] = np.pad(image[:, :], pad, mode='constant')
+
+    # Convolve the padded image with the Gaussian kernel
+    filtered_image = padded_image
+    height, width = image.shape
+
+    for i in range(height - ksize + 1):
+        for j in range(width - ksize + 1):
+            if padded_image[i, j] == 0:
+                patch = image[i:i + ksize, j:j + ksize]
+                med = np.quantile(patch, 0.75)
+                filtered_image[i, j] = med
+
+
+    return filtered_image
+
+def median_filter_handmode_rgb(image, ksize):
+    # Create a Gaussian kernel
+
+    # Apply padding to the image
+    pad = ksize // 2
+    padded_image = np.zeros((image.shape[0] + pad * 2,
+                             image.shape[1] + pad * 2, image.shape[2]),
+                             dtype=np.uint8)
+    height, width, channels = image.shape
+
+    for k in range(channels):
+        padded_image[:, :, k] = np.pad(image[:, :, k], pad, mode='constant')
+
+    # Convolve the padded image with the Gaussian kernel
+    filtered_image = padded_image
+
+    for k in range(channels):
+        for i in range(height - ksize + 1):
+            for j in range(width - ksize + 1):
+                if padded_image[i, j, k] == 0:
+                    patch = image[i:i + ksize, j:j + ksize, k]
+                    med = np.quantile(patch, 0.75)
+                    filtered_image[i, j, k] = med
+
+
+    return filtered_image
+
 
 def winsort(data):
     _StrCmpLogicalW = windll.Shlwapi.StrCmpLogicalW
     _StrCmpLogicalW.argtypes = [wintypes.LPWSTR, wintypes.LPWSTR]
-    _StrCmpLogicalW.restype = wintypes.INT
+    _StrCmpLogicalW.restype  = wintypes.INT
 
     cmp_fnc = lambda psz1, psz2: _StrCmpLogicalW(psz1, psz2)
     return sorted(data, key=cmp_to_key(cmp_fnc))
 
-
-# 454 - 700
-# np_color_im = cv2.imread("G:/Vista_project/finish_deep/aligned_rs/650color.png", cv2.IMREAD_COLOR)
-# np_color_im = cv2.cvtColor(np_color_im, cv2.COLOR_BGR2RGB)
-# np_depth_im = cv2.imread("G:/Vista_project/finish_deep/aligned_rs/650depth.png", cv2.IMREAD_ANYDEPTH)
-# np_left_im = cv2.imread("G:/Vista_project/finish_deep/left_resized/650color.png", cv2.IMREAD_ANYDEPTH)
+#454 - 700
+#np_color_im = cv2.imread("G:/Vista_project/finish_deep/aligned_rs/650color.png", cv2.IMREAD_COLOR)
+#np_color_im = cv2.cvtColor(np_color_im, cv2.COLOR_BGR2RGB)
+#np_depth_im = cv2.imread("G:/Vista_project/finish_deep/aligned_rs/650depth.png", cv2.IMREAD_ANYDEPTH)
+#np_left_im = cv2.imread("G:/Vista_project/finish_deep/left_resized/650color.png", cv2.IMREAD_ANYDEPTH)
 
 quartet_folder_name = "sync"
 
@@ -39,20 +91,20 @@ all_files = winsort(all_files)
 # file num 726
 # TODO: there are still not synced frames (singles)
 # TODO: bad sync at fast rotations or fast velocity/accelerations
-file_num = 3339
+file_num = 0
 files = 4
-# file_num = file_num - 1
+#file_num = file_num - 1
 thermal_file_path = gen_path + str(dataset_num) + "_ready/" + \
                     quartet_folder_name + "/" + \
                     all_files[file_num * files + 2]
-if "right" in thermal_file_path:
-    right_file_path = thermal_file_path
-    left_file_path = gen_path + str(dataset_num) + "_ready/" + \
-                     quartet_folder_name + "/" + all_files[file_num * files + 3]
-else:
+if "left" in thermal_file_path:
     left_file_path = thermal_file_path
     right_file_path = gen_path + str(dataset_num) + "_ready/" + \
                       quartet_folder_name + "/" + all_files[file_num * files + 3]
+else:
+    right_file_path = thermal_file_path
+    left_file_path = gen_path + str(dataset_num) + "_ready/" + \
+                     quartet_folder_name + "/" + all_files[file_num * files + 3]
 
 color_file_path = gen_path + str(dataset_num) + \
                   "_ready/" + quartet_folder_name + "/" + \
@@ -63,7 +115,8 @@ depth_file_path = gen_path + str(dataset_num) + "_ready/" + \
 np_color_im = cv2.imread(color_file_path, cv2.IMREAD_COLOR)
 np_color_im = cv2.cvtColor(np_color_im, cv2.COLOR_BGR2RGB)
 np_depth_im = cv2.imread(depth_file_path, cv2.IMREAD_ANYDEPTH)
-np_left_im = cv2.imread(left_file_path, cv2.IMREAD_ANYDEPTH)
+np_right_im = cv2.imread(right_file_path, cv2.IMREAD_ANYDEPTH)
+
 
 color_raw = o3d.geometry.Image(np_color_im)
 depth_raw = o3d.geometry.Image(np_depth_im)
@@ -114,10 +167,10 @@ color_image = np.asarray(rgbd_image.color)
         Fy:           786.333374023438
     '''
 
-cx = 648.483276367188
-cy = 359.049194335938
-fx = 787.998596191406
-fy = 786.333374023438
+cx=648.483276367188
+cy=359.049194335938
+fx=787.998596191406
+fy=786.333374023438
 
 depthscale = 1000
 depth_image = np.asarray(rgbd_image.depth) * 1000
@@ -130,7 +183,7 @@ XYZ = np.stack((X, Y, Z), axis=-1)
 indices = depth_image > 0
 np_points = XYZ[indices, :]
 np_colors = color_image[indices, :]
-color_image_projected_on_depth = np.zeros((720, 1280, 3), dtype=int)
+color_image_projected_on_depth = np.zeros((720,1280,3), dtype=int)
 color_image_projected_on_depth[indices, :] = color_image[indices, :]
 
 xyz_matrix = np.zeros((720, 1280, 3), dtype=np.float64)
@@ -205,19 +258,19 @@ point_xyz = xyz_matrix[point_u, point_v].transpose()
 point_color = color_image[point_u, point_v]
 point_depth = depth_image[point_u, point_v]
 
-# therm_focals = [1008.8578238167438196598189451667,	1020.9726220290907682227917520318]
-therm_focals = [835.8578238167438196598189451667, 815.9726220290907682227917520318]  # hor, ver
-therm_centers = [319.690452842080, 200.489004453523]
+#therm_focals = [1008.8578238167438196598189451667,	1020.9726220290907682227917520318]
+therm_focals = [835.8578238167438196598189451667,	815.9726220290907682227917520318] # hor, ver
+therm_centers = [319.690452842080,	200.489004453523]
 therm_distortion_coefs = [3.26801409578410, -296.593697284903, 0, 0, 16968.6805606598]
 
-rs_focals = [700.715723643176, 700.900750363357]
+rs_focals = [700.715723643176,	700.900750363357]
 rs_centers = [627.056652072525, 428.897247449207]
-rs_distortion_coefs = [0.631373966934844, -21.1797091234745, 0, 0, 146.583455319192]
+rs_distortion_coefs = [0.631373966934844, -21.1797091234745, 0, 0,	146.583455319192]
 
 original_rs_focals = [787.998596191406, 786.333374023438]
 original_rs_centers = [648.483276367188, 359.049194335938]
 
-# after matlab refine
+#after matlab refine
 
 
 R = np.array([
@@ -229,16 +282,15 @@ R = np.array([
 t = np.array([-121.952452666493, 189.727110138437, -813.867721109518])
 
 
-def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R=np.eye, t=np.ones((3, 1))):
-    # distortion_coefs: k1,k2,p1,p2,k3, focals: fx,fy, centers same.
+def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np.eye, t = np.ones((3,1))):
+    #distortion_coefs: k1,k2,p1,p2,k3, focals: fx,fy, centers same.
     xyz = point_xyz * 1000
-    t[0] = t[0] - 50  # + move left camera angle changes right
-    t[1] = t[1] - 300  # + move up camera
-    # t[2] = t[2] + 150
-    rotated_translated_xyz = R @ xyz + t.reshape(3, 1)
+    t[0] = t[0] # + move left camera angle changes right
+    t[1] = t[1] - 300 # + move up camera
+    #t[2] = t[2] + 150
+    rotated_translated_xyz = R @ xyz + t.reshape(3,1)
 
-    x, y = rotated_translated_xyz[0, :] / rotated_translated_xyz[2, :], rotated_translated_xyz[1,
-                                                                        :] / rotated_translated_xyz[2, :]
+    x, y = rotated_translated_xyz[0, :] / rotated_translated_xyz[2, :], rotated_translated_xyz[1, :] / rotated_translated_xyz[2, :]
 
     if use_dist:
         r2 = x * x + y * y;
@@ -249,10 +301,8 @@ def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R=np.e
         x = dx;
         y = dy;
 
-    pixel_u = x * focals[0] + centers[
-        0] - 37.5  # + is right (if camera moved left here it should brought left and vice versa)
-    pixel_v = y * focals[1] + centers[
-        1] + 18  # + is down (if camera moved down here it should brought down and vice versa)
+    pixel_u = x * focals[0] + centers[0] - 40# + is right (if camera moved left here it should brought left and vice versa)
+    pixel_v = y * focals[1] + centers[1] + 21  # + is down (if camera moved down here it should brought down and vice versa)
     pixel_u[(pixel_u <= 0) | (pixel_u > 1279.5)] = 0
     pixel_v[(pixel_v <= 0) | (pixel_v > 719.5)] = 0
 
@@ -269,22 +319,15 @@ projected_depth[igul_u, igul_v] = point_depth
 points_2d = np.load("points_2d.npz")["arr_0"]
 camera_indices = np.load("camera_indices.npz")["arr_0"]
 point_indices = np.load("point_indices.npz")["arr_0"]
-points_3d_left = np.load("points_3d_left.npz")["arr_0"]
 
 
+filtered_projected = median_filter_handmode_1D(
+    projected_depth[:np_right_im.shape[0],
+    :np_right_im.shape[1]], 3)[1:-1, 1:-1]
 
-color_raw = o3d.geometry.Image(np_left_im)
-depth_raw = o3d.geometry.Image(projected_depth[:np_left_im.shape[0], :np_left_im.shape[1]])
-
-rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
-    color_raw, depth_raw, depth_scale=1000.0, depth_trunc=1000, convert_rgb_to_intensity=False)
 
 height = 512
 width = 640
-
-depthscale = 1000
-depth_image = np.asarray(rgbd_image.depth, dtype=np.float64) * depthscale
-color_image = np.asarray(rgbd_image.color)
 
 cx=319.690452842080
 cy=200.489004453523
@@ -292,18 +335,20 @@ fx=835.8578238167438196598189451667
 fy=815.9726220290907682227917520318
 
 depthscale = 1000
-depth_image = np.asarray(rgbd_image.depth) * 1000
+depth_image = filtered_projected
 U = np.asarray(list(range(width))).reshape(1, -1).repeat(height, axis=0)
 V = np.asarray(list(range(height))).reshape(-1, 1).repeat(width, axis=1)
-Z = depth_image / depthscale
+Z = depth_image
 X = (U - cx) * Z / fx
 Y = (V - cy) * Z / fy
 XYZ = np.stack((X, Y, Z), axis=-1)
 
 points_3d_right = XYZ[points_2d[points_2d.shape[0] // 2:, 0],
                      points_2d[points_2d.shape[0] // 2:, 1], :]
+np.savez("points_3d_right.npz", points_3d_right)
 
 
-points_3d = np.concatenate((points_3d_left, points_3d_right))
-np.savez("points_3d.npz", points_3d)
-os.remove("points_3d_left.npz")
+
+
+
+
