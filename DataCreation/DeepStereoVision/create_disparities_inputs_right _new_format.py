@@ -11,6 +11,34 @@ from ctypes import wintypes, windll
 from functools import cmp_to_key
 from PIL import Image
 
+import numpy as np
+def median_filter_handmode(image, ksize):
+    # Create a Gaussian kernel
+
+    # Apply padding to the image
+    pad = ksize // 2
+    padded_image = np.zeros((image.shape[0] + pad * 2,
+                             image.shape[1] + pad * 2, image.shape[2]),
+                             dtype=np.uint8)
+    height, width, channels = image.shape
+
+    for k in range(channels):
+        padded_image[:, :, k] = np.pad(image[:, :, k], pad, mode='constant')
+
+    # Convolve the padded image with the Gaussian kernel
+    filtered_image = padded_image
+
+    for k in range(channels):
+        for i in range(height - ksize + 1):
+            for j in range(width - ksize + 1):
+                if padded_image[i, j, k] == 0:
+                    patch = image[i:i + ksize, j:j + ksize, k]
+                    med = np.quantile(patch, 0.75)
+                    filtered_image[i, j, k] = med
+
+
+    return filtered_image
+
 
 def winsort(data):
     _StrCmpLogicalW = windll.Shlwapi.StrCmpLogicalW
@@ -26,7 +54,7 @@ def winsort(data):
 #np_depth_im = cv2.imread("G:/Vista_project/finish_deep/aligned_rs/650depth.png", cv2.IMREAD_ANYDEPTH)
 #np_left_im = cv2.imread("G:/Vista_project/finish_deep/left_resized/650color.png", cv2.IMREAD_ANYDEPTH)
 
-quartet_folder_name = "sync_color_to_depth"
+quartet_folder_name = "sync"
 
 dataset_num = 21
 gen_path = "F:/Vista_project2/"
@@ -38,7 +66,7 @@ all_files = winsort(all_files)
 # file num 726
 # TODO: there are still not synced frames (singles)
 # TODO: bad sync at fast rotations or fast velocity/accelerations
-file_num = 197
+file_num = 0
 files = 4
 #file_num = file_num - 1
 thermal_file_path = gen_path + str(dataset_num) + "_ready/" + \
@@ -63,6 +91,7 @@ np_color_im = cv2.imread(color_file_path, cv2.IMREAD_COLOR)
 np_color_im = cv2.cvtColor(np_color_im, cv2.COLOR_BGR2RGB)
 np_depth_im = cv2.imread(depth_file_path, cv2.IMREAD_ANYDEPTH)
 np_right_im = cv2.imread(right_file_path, cv2.IMREAD_ANYDEPTH)
+
 
 color_raw = o3d.geometry.Image(np_color_im)
 depth_raw = o3d.geometry.Image(np_depth_im)
@@ -205,7 +234,7 @@ point_color = color_image[point_u, point_v]
 point_depth = depth_image[point_u, point_v]
 
 #therm_focals = [1008.8578238167438196598189451667,	1020.9726220290907682227917520318]
-therm_focals = [813.8578238167438196598189451667,	815.9726220290907682227917520318] # hor, ver
+therm_focals = [835.8578238167438196598189451667,	815.9726220290907682227917520318] # hor, ver
 therm_centers = [319.690452842080,	200.489004453523]
 therm_distortion_coefs = [3.26801409578410, -296.593697284903, 0, 0, 16968.6805606598]
 
@@ -231,7 +260,7 @@ t = np.array([-121.952452666493, 189.727110138437, -813.867721109518])
 def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np.eye, t = np.ones((3,1))):
     #distortion_coefs: k1,k2,p1,p2,k3, focals: fx,fy, centers same.
     xyz = point_xyz * 1000
-    t[0] = t[0] - 50# + move left camera angle changes right
+    t[0] = t[0] # + move left camera angle changes right
     t[1] = t[1] - 300 # + move up camera
     #t[2] = t[2] + 150
     rotated_translated_xyz = R @ xyz + t.reshape(3,1)
@@ -247,7 +276,7 @@ def project(point_xyz, focals, centers, distortion_coefs, use_dist=False, R = np
         x = dx;
         y = dy;
 
-    pixel_u = x * focals[0] + centers[0] - 32# + is right (if camera moved left here it should brought left and vice versa)
+    pixel_u = x * focals[0] + centers[0] - 40# + is right (if camera moved left here it should brought left and vice versa)
     pixel_v = y * focals[1] + centers[1] + 21  # + is down (if camera moved down here it should brought down and vice versa)
     pixel_u[(pixel_u <= 0) | (pixel_u > 1279.5)] = 0
     pixel_v[(pixel_v <= 0) | (pixel_v > 719.5)] = 0
