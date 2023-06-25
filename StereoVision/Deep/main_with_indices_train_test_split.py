@@ -41,13 +41,15 @@ if __name__ == '__main__':
             self.avg = self.sum / self.count
 
 
-    dataset = CustomImageDataset(
-        img_dir="/content/data/",
-        transform=True
+    train_set = CustomImageDataset(
+        img_dir="/content/data/train/",
+        transform=False
+    )
+    val_set = CustomImageDataset(
+        img_dir="/content/data/test/",
+        transform=False
     )
     test_size = 50
-    lengths = [len(dataset) - test_size, test_size]
-    train_set, val_set = torch.utils.data.random_split(dataset, lengths)
 
     from torch.utils.data import DataLoader
 
