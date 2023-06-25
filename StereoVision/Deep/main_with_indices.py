@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from dataloaders import CustomImageDataset
 from losses.multiscaleloss import multiscaleloss, EPE
 from networks.FADNet import FADNet
+import torchvision.transforms as T
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -41,7 +42,8 @@ if __name__ == '__main__':
 
 
     dataset = CustomImageDataset(
-        img_dir="/content/data/"
+        img_dir="/content/data/",
+        transform=True
     )
     test_size = 50
     lengths = [len(dataset) - test_size, test_size]
@@ -73,7 +75,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr,
                                  betas=(momentum, beta), amsgrad=True)
     decayRate = 0.98
-    #lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
+    # lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
 
     train_losses = AverageMeter()
     train_flow2_EPEs = AverageMeter()
@@ -90,7 +92,7 @@ if __name__ == '__main__':
     previous_EPE = float(max_uint16)
 
     prev_cycles = 0
-    
+
     prev_chkpnt = ""
 
     for r in range(startRound, len(FADNet_loss_config["epoches"])):
@@ -197,15 +199,17 @@ if __name__ == '__main__':
             writer.add_scalar("test/epoch/EPE", test_flow2_EPEs.avg, prev_cycles + k)
             if test_flow2_EPEs.avg < previous_EPE:
                 if prev_chkpnt != '':
-                    open(prev_chkpnt).close()
+                    open(prev_chkpnt, "w").close()
                     os.remove(prev_chkpnt)
                 torch.save({
                     'epoch': prev_cycles + k,
                     'model_state_dict': net.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': test_flow2_EPEs.avg,
-                }, "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg))
+                }, "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(
+                    test_flow2_EPEs.avg))
                 previous_EPE = test_flow2_EPEs.avg
-                prev_chkpnt = "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg)
+                prev_chkpnt = "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(
+                    test_flow2_EPEs.avg)
 
         prev_cycles = prev_cycles + FADNet_loss_config["epoches"][max(0, r - 1)]
