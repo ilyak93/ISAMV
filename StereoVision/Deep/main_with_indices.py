@@ -1,3 +1,5 @@
+import os
+
 import matplotlib
 import torch
 import torchvision
@@ -88,6 +90,8 @@ if __name__ == '__main__':
     previous_EPE = float(max_uint16)
 
     prev_cycles = 0
+    
+    prev_chkpnt = ""
 
     for r in range(startRound, len(FADNet_loss_config["epoches"])):
         cycles = FADNet_loss_config["epoches"][r]
@@ -192,6 +196,8 @@ if __name__ == '__main__':
             writer.add_scalar("test/epoch/loss", test_losses.avg, prev_cycles + k)
             writer.add_scalar("test/epoch/EPE", test_flow2_EPEs.avg, prev_cycles + k)
             if test_flow2_EPEs.avg < previous_EPE:
+                if prev_chkpnt != '':
+                    os.remove(prev_chkpnt)
                 torch.save({
                     'epoch': prev_cycles + k,
                     'model_state_dict': net.state_dict(),
@@ -199,5 +205,6 @@ if __name__ == '__main__':
                     'loss': test_flow2_EPEs.avg,
                 }, "./" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg))
                 previous_EPE = test_flow2_EPEs.avg
+                prev_chkpnt = "./" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg)
 
         prev_cycles = prev_cycles + FADNet_loss_config["epoches"][max(0, r - 1)]
