@@ -5,7 +5,11 @@ import open3d as o3d
 import numpy as np
 from matplotlib.pyplot import imshow, show, hist
 import os
-from ctypes import wintypes, windll
+import platform
+if platform.system() == 'Windows':
+    from ctypes import wintypes, windll
+else:
+    from natsort import natsorted
 from functools import cmp_to_key
 from PIL import Image
 
@@ -21,6 +25,8 @@ def winsort(data):
     cmp_fnc = lambda psz1, psz2: _StrCmpLogicalW(psz1, psz2)
     return sorted(data, key=cmp_to_key(cmp_fnc))
 
+sort_func = winsort if platform.system() == 'Windows' else natsorted 
+
 class CustomImageDataset(Dataset):
     def __init__(self, img_dir, transform=None, target_transform=None):
 
@@ -29,10 +35,10 @@ class CustomImageDataset(Dataset):
         right_images = [img_dir+file for file in all_files if "right" in file]
         disparities = [img_dir+file for file in all_files if "dis" in file]
         depths = [img_dir+file for file in all_files if "depth" in file]
-        self.left_images = winsort(left_images)
-        self.right_image = winsort(right_images)
-        self.disparities = winsort(disparities)
-        self.depths = winsort(depths)
+        self.left_images = sort_func(left_images)
+        self.right_image = sort_func(right_images)
+        self.disparities = sort_func(disparities)
+        self.depths = sort_func(depths)
         self.transform = transform
         self.size = len(self.left_images)
         self.target_transform = target_transform
