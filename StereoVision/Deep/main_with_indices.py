@@ -197,6 +197,7 @@ if __name__ == '__main__':
             writer.add_scalar("test/epoch/EPE", test_flow2_EPEs.avg, prev_cycles + k)
             if test_flow2_EPEs.avg < previous_EPE:
                 if prev_chkpnt != '':
+                    open(prev_chkpnt).close()
                     os.remove(prev_chkpnt)
                 torch.save({
                     'epoch': prev_cycles + k,
