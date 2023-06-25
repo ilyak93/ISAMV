@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
 
     dataset = CustomImageDataset(
-        img_dir="C:/dataset/small_lrdd/"
+        img_dir="/content/data/"
     )
     test_size = 50
     lengths = [len(dataset) - test_size, test_size]
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     train_losses = AverageMeter()
     train_flow2_EPEs = AverageMeter()
 
-    writer = SummaryWriter()
+    writer = SummaryWriter("/content/drive/MyDrive/Deep/")
     i = 0
     j = 0
     cycles = 2
@@ -203,8 +203,8 @@ if __name__ == '__main__':
                     'model_state_dict': net.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': test_flow2_EPEs.avg,
-                }, "./" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg))
+                }, "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg))
                 previous_EPE = test_flow2_EPEs.avg
-                prev_chkpnt = "./" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg)
+                prev_chkpnt = "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(test_flow2_EPEs.avg)
 
         prev_cycles = prev_cycles + FADNet_loss_config["epoches"][max(0, r - 1)]
