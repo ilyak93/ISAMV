@@ -75,7 +75,10 @@ class CustomImageDataset(Dataset):
             #    mu, sigma = 0, 2000 # mean and standard deviation
             #    right_image = right_image + np.random.normal(mu, sigma, left_image.shape)
             if random.random() < 0.5:
-                left_image = left_image + random.random() * 2000
+                r = random.random() * 2000
+                left_image[left_image + r > 2 ** 16 - 1] = 2 ** 16 - 1
+                left_image[left_image + r < 2 ** 16 - 1] = left_image[left_image + r < 2 ** 16 - 1] + r
             if random.random() < 0.5:
-                right_image = right_image + random.random() * 2000
+                right_image[right_image + r > 2 ** 16 - 1] = 2 ** 16 - 1
+                right_image[right_image + r < 2 ** 16 - 1] = right_image[right_image + r < 2 ** 16 - 1] + r
         return [left_image.copy(), right_image.copy()], [disparity.copy(), depth.copy()]
