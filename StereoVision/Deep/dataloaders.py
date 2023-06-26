@@ -61,4 +61,11 @@ class CustomImageDataset(Dataset):
         #    right_image = self.transform(right_image)
         #if self.target_transform:
         #    label = self.target_transform(label)
-        return [left_image, right_image], [disparity, depth]
+        if self.transform:
+            if random.random() < 0.5:
+                left_image, right_image, disparity, depth = \
+                np.flipud(left_image), np.flipud(right_image), np.flipud(disparity), np.flipud(depth)
+            if random.random() < 0.5:
+                left_image, right_image, disparity, depth = \
+                np.fliplr(left_image), np.fliplr(right_image), np.fliplr(disparity), np.fliplr(depth)
+        return [left_image.copy(), right_image.copy()], [disparity.copy(), depth.copy()]
