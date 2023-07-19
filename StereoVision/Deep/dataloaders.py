@@ -13,6 +13,8 @@ else:
 from functools import cmp_to_key
 from PIL import Image
 import random
+from skimage import exposure
+
 
 import os
 from torch.utils.data import Dataset
@@ -27,6 +29,10 @@ def winsort(data):
     return sorted(data, key=cmp_to_key(cmp_fnc))
 
 sort_func = winsort if platform.system() == 'Windows' else natsorted 
+
+def histogram_equalize(img):
+    img_cdf, bin_centers = exposure.cumulative_distribution(img)
+    return np.interp(img, bin_centers, img_cdf)
 
 class CustomImageDataset(Dataset):
     def __init__(self, img_dir, transform=None, target_transform=None):
@@ -70,6 +76,9 @@ class CustomImageDataset(Dataset):
                 left_image, right_image, disparity, depth = \
                 np.fliplr(left_image), np.fliplr(right_image), np.fliplr(disparity), np.fliplr(depth)
             if random.random() < 0.5:
+                left_image, right_image, disparity, depth = \
+                np.fliplr(left_image), np.fliplr(right_image), np.fliplr(disparity), np.fliplr(depth)
+            if random.random() < 0.5:
                 mu, sigma = 0, 2000 # mean and standard deviation
                 r = np.random.normal(mu, sigma, left_image.shape)
                 left_image[left_image + r > 2 ** 16 - 1] = 2 ** 16 - 1
@@ -80,11 +89,14 @@ class CustomImageDataset(Dataset):
                 right_image[right_image + r > 2 ** 16 - 1] = 2 ** 16 - 1
                 right_image[right_image + r <= 2 ** 16 - 1] = right_image[right_image + r <= 2 ** 16 - 1] + r
             if random.random() < 0.5:
-                r = random.random() * 2000
+                r = random.random() * 30000
                 left_image[left_image + r > 2 ** 16 - 1] = 2 ** 16 - 1
                 left_image[left_image + r <= 2 ** 16 - 1] = left_image[left_image + r <= 2 ** 16 - 1] + r
             if random.random() < 0.5:
-                r = random.random() * 2000
+                r = random.random() * 30000
                 right_image[right_image + r > 2 ** 16 - 1] = 2 ** 16 - 1
                 right_image[right_image + r <= 2 ** 16 - 1] = right_image[right_image + r <= 2 ** 16 - 1] + r
+            if random.random() < 0.5:
+                left_image, right_image =
+                histogram_equalize(left_image), histogram_equalize(right_image)
         return [left_image.copy(), right_image.copy()], [disparity.copy(), depth.copy()]
