@@ -32,7 +32,7 @@ sort_func = winsort if platform.system() == 'Windows' else natsorted
 
 def histogram_equalize(img):
     img_cdf, bin_centers = exposure.cumulative_distribution(img)
-    return np.interp(img, bin_centers, img_cdf)
+    return np.interp(img, bin_centers, img_cdf).astype(np.float32)
 
 class CustomImageDataset(Dataset):
     def __init__(self, img_dir, transform=None, target_transform=None):
