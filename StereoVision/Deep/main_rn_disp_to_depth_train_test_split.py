@@ -15,6 +15,13 @@ import torchvision.transforms as T
 
 from torch.utils.tensorboard import SummaryWriter
 
+from skimage import exposure
+import numpy as np
+
+def histogram_equalize(img):
+    img_cdf, bin_centers = exposure.cumulative_distribution(img)
+    return np.interp(img, bin_centers, img_cdf).astype(np.float32)
+
 # tensorboard --logdir runs
 
 if __name__ == '__main__':
@@ -49,7 +56,6 @@ if __name__ == '__main__':
         img_dir="/content/data/test/",
         transform=False
     )
-    test_size = 50
 
     from torch.utils.data import DataLoader
 
@@ -57,8 +63,22 @@ if __name__ == '__main__':
     train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4)
     test_dataloader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=4)
 
-    input_channel = 3
-    net = FADNet(input_channel=input_channel).cuda()
+    in_channels = 1
+    net = fcn_resnet101(pretrained=True)
+    backbone_first_conv = net.backbone.conv1
+    net.backbone.conv1 = nn.Conv2d(in_channels=in_channels,
+                                   out_channels=backbone_first_conv.out_channels,
+                                   kernel_size=backbone_first_conv.kernel_size,
+                                   stride=backbone_first_conv.stride,
+                                   padding=backbone_first_conv.padding,
+                                   bias=backbone_first_conv.bias)
+
+    num_classes = 1  # Adjust this according to the number of output channels you want
+    classifier_last_layer = net.classifier[4]
+    net.classifier[4] = nn.Conv2d(in_channels=classifier_last_layer.in_channels,
+                                  out_channels=num_classes,
+                                  kernel_size=classifier_last_layer.kernel_size,
+                                  stride=classifier_last_layer.stride)
 
     FADNet_loss_config = {
         "loss_scale": 7,
@@ -102,34 +122,22 @@ if __name__ == '__main__':
         for k in range(cycles):
             net.train()
             for [left_img, right_img], [target_disp, depths] in train_dataloader:
-                left_img = left_img.unsqueeze(dim=1) / max_uint16
-                right_img = right_img.unsqueeze(dim=1) / max_uint16
-                actual_batch_size = left_img.size(0)
-                row_indices_feature = torch.tensor(list(range(rows))).reshape([-1, 1]).repeat(1, cols).unsqueeze(
-                    0).repeat(actual_batch_size, 1, 1).unsqueeze(1) / rows
-                cols_indices_feature = torch.tensor(list(range(cols))).reshape([1, -1]).repeat(rows, 1).unsqueeze(
-                    0).repeat(actual_batch_size, 1, 1).unsqueeze(1) / cols
-                left_img_with_indices = torch.cat([left_img, row_indices_feature, cols_indices_feature], dim=1)
-                right_img_with_indices = torch.cat([right_img, row_indices_feature, cols_indices_feature], dim=1)
+                
+                target_disp = torch.sqrt(target_disp).unsqueeze(dim=1)
+                target_disp /= 2 ** 8
+
 
                 # target_disp = torch.sqrt(target_disp.unsqueeze(dim=1)).cuda()
-                target_dis = depths.unsqueeze(dim=1).cuda() / 1000
-                inputs = torch.cat((left_img_with_indices, right_img_with_indices), dim=1).cuda()
-                output_net1, output_net2 = net(inputs)
-                criterion = multiscaleloss(FADNet_loss_config['loss_scale'],
-                                           1, FADNet_loss_config['loss_weights'][r],
-                                           loss='L1', sparse=False)
-                loss_net1 = criterion(output_net1, target_dis)
-                loss_net2 = criterion(output_net2, target_dis)
-                loss = loss_net1 + loss_net2
-                output_net2_final = output_net2[0]
-                flow2_EPE = EPE(output_net2_final, target_dis)
+                target_dis = depths.unsqueeze(dim=1) / 1000
+                inputs = target_disp
+                output = net(inputs)
 
-                train_losses.update(loss.data.item(), inputs.size(0))
+                flow2_EPE = EPE(output, target_dis)
+
                 train_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
                 # compute gradient and do SGD step
-                loss.backward()
+                flow2_EPE.backward()
                 optimizer.step()
 
                 if i % 10 == 0:
@@ -137,44 +145,28 @@ if __name__ == '__main__':
                     #            'Loss {loss.val:.3f} ({loss.avg:.3f})\t'
                     #            'EPE {flow2_EPE.val:.3f} ({flow2_EPE.avg:.3f})\t'.format(
                     #    r, i, loss=losses, flow2_EPE=flow2_EPEs))
-                    writer.add_scalar("train/per_10_iterations/loss", loss.data.item(), i)
                     writer.add_scalar("train/per_10_iterations/EPE", flow2_EPE.data.item(), i)
                 i = i + 1
 
-            writer.add_scalar("train/epoch/loss", train_losses.avg, prev_cycles + k)
             writer.add_scalar("train/epoch/EPE", train_flow2_EPEs.avg, prev_cycles + k)
 
             # lr_scheduler.step()
 
-            test_losses = AverageMeter()
             test_flow2_EPEs = AverageMeter()
             with torch.no_grad():
-                test_losses = AverageMeter()
                 test_flow2_EPEs = AverageMeter()
                 net.eval()
                 for [left_img, right_img], [target_disp, depths] in test_dataloader:
-                    left_img = left_img.unsqueeze(dim=1) / max_uint16
-                    right_img = right_img.unsqueeze(dim=1) / max_uint16
-
-                    actual_batch_size = left_img.size(0)
-                    row_indices_feature = torch.tensor(list(range(rows))).reshape([-1, 1]).repeat(1, cols).unsqueeze(
-                        0).repeat(actual_batch_size, 1, 1).unsqueeze(1) / rows
-                    cols_indices_feature = torch.tensor(list(range(cols))).reshape([1, -1]).repeat(rows, 1).unsqueeze(
-                        0).repeat(actual_batch_size, 1, 1).unsqueeze(1) / cols
-                    left_img_with_indices = torch.cat([left_img, row_indices_feature, cols_indices_feature], dim=1)
-                    right_img_with_indices = torch.cat([right_img, row_indices_feature, cols_indices_feature], dim=1)
+                    target_disp = torch.sqrt(target_disp).unsqueeze(dim=1)
+                    target_disp /= 2 ** 8
 
                     # target_disp = torch.sqrt(target_disp.unsqueeze(dim=1)).cuda()
-                    target_dis = depths.unsqueeze(dim=1).cuda() / 1000
-                    inputs = torch.cat((left_img_with_indices, right_img_with_indices), dim=1).cuda()
-                    output_net1, output_net2 = net(inputs)
+                    target_dis = depths.unsqueeze(dim=1) / 1000
+                    inputs = target_disp
+                    output = net(inputs)
 
-                    loss_net1 = EPE(output_net1, target_dis)
-                    loss_net2 = EPE(output_net2, target_dis)
-                    loss = loss_net1 + loss_net2
-                    flow2_EPE = EPE(output_net2, target_dis)
+                    flow2_EPE = EPE(output, target_dis)
 
-                    test_losses.update(loss.data.item(), inputs.size(0))
                     test_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
                     if j % 2 == 0:
@@ -182,14 +174,13 @@ if __name__ == '__main__':
                         #            'Loss {loss.val:.3f} ({loss.avg:.3f})\t'
                         #            'EPE {flow2_EPE.val:.3f} ({flow2_EPE.avg:.3f})\t'.format(
                         #    r, i, loss=losses, flow2_EPE=flow2_EPEs))
-                        writer.add_scalar("test/per_10_iterations/loss", loss.data.item(), j)
                         writer.add_scalar("test/per_10_iterations/EPE", flow2_EPE.data.item(), j)
                         orig_viz = torch.cat((left_img[0].cpu(),
                                               right_img[0].cpu(),
-                                              target_dis[0].cpu() / 256,
-                                              output_net2[0].cpu() / 256,
+                                              torch.tensor(histogram_equalize(target_dis[0].cpu().numpy())),
+                                              output[0].cpu() / 256,
                                               torch.abs(target_dis[0].cpu() / 256 -
-                                                        output_net2[0].cpu() / 256)),
+                                                        output.cpu() / 256)),
                                              0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
@@ -197,7 +188,6 @@ if __name__ == '__main__':
                                          dataformats='CHW')
                     j = j + 1
 
-            writer.add_scalar("test/epoch/loss", test_losses.avg, prev_cycles + k)
             writer.add_scalar("test/epoch/EPE", test_flow2_EPEs.avg, prev_cycles + k)
             if test_flow2_EPEs.avg < previous_EPE:
                 if prev_chkpnt != '':
