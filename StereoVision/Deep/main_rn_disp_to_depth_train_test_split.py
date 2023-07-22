@@ -13,6 +13,7 @@ from losses.multiscaleloss import multiscaleloss, EPE
 from networks.FADNet import FADNet
 import torchvision.transforms as T
 from torchvision.models.segmentation import fcn_resnet101
+from torch import nn
 
 from torch.utils.tensorboard import SummaryWriter
 
