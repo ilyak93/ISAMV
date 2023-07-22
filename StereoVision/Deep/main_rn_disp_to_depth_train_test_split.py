@@ -179,12 +179,17 @@ if __name__ == '__main__':
                         #    r, i, loss=losses, flow2_EPE=flow2_EPEs))
                         writer.add_scalar("test/per_10_iterations/EPE", flow2_EPE.data.item(), j)
 
-                        orig_viz = torch.cat((left_img[0].cpu(),
-                                              right_img[0].cpu(),
-                                              torch.tensor(histogram_equalize(inputs[0].cpu().numpy()))[0],
-                                              output[0][0].cpu() / 256,
+
+
+                        
+                        eq_disp = torch.tensor(histogram_equalize(inputs[0].cpu().numpy()))
+                        
+                        orig_viz = torch.cat((left_img[0].cpu().unsqueeze(0),
+                                              right_img[0].cpu().unsqueeze(0),
+                                              eq_disp,
+                                              output[0].cpu() / 256,
                                               torch.abs(label[0].cpu() / 256 -
-                                                        output[0].cpu() / 256)[0]),
+                                                        output[0].cpu() / 256)),
                                              0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
