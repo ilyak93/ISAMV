@@ -183,7 +183,7 @@ if __name__ == '__main__':
                                               torch.tensor(histogram_equalize(inputs[0].cpu().numpy())),
                                               output[0].cpu() / 256,
                                               torch.abs(label[0].cpu() / 256 -
-                                                        output.cpu() / 256)),
+                                                        output[0].cpu() / 256)),
                                              0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
