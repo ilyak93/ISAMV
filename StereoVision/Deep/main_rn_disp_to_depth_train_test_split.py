@@ -181,10 +181,10 @@ if __name__ == '__main__':
 
                         orig_viz = torch.cat((left_img[0].cpu(),
                                               right_img[0].cpu(),
-                                              torch.tensor(histogram_equalize(inputs[0].cpu().numpy())).squeeze(),
-                                              output[0].cpu().squeeze() / 256,
+                                              torch.tensor(histogram_equalize(inputs[0].cpu().numpy()))[0],
+                                              output[0][0].cpu() / 256,
                                               torch.abs(label[0].cpu() / 256 -
-                                                        output[0].cpu() / 256).squeeze()),
+                                                        output[0].cpu() / 256)[0]),
                                              0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
