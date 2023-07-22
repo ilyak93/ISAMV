@@ -12,8 +12,8 @@ from dataloaders import CustomImageDataset
 from losses.multiscaleloss import multiscaleloss, EPE
 from networks.FADNet import FADNet
 import torchvision.transforms as T
-from torchvision.models.segmentation import fcn_resnet101
 from torch import nn
+from torchvision.models.segmentation import fcn_resnet101
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     train_set = CustomImageDataset(
         img_dir="/content/data/train/",
-        transform=False
+        transform=True
     )
     val_set = CustomImageDataset(
         img_dir="/content/data/test/",
@@ -81,7 +81,7 @@ if __name__ == '__main__':
                                   out_channels=num_classes,
                                   kernel_size=classifier_last_layer.kernel_size,
                                   stride=classifier_last_layer.stride)
-
+    net = net.cuda()
     FADNet_loss_config = {
         "loss_scale": 7,
         "round": 4,
@@ -132,10 +132,10 @@ if __name__ == '__main__':
 
                 # target_disp = torch.sqrt(target_disp.unsqueeze(dim=1)).cuda()
                 target_dis = depths.unsqueeze(dim=1) / 1000
-                inputs = target_disp
+                inputs = target_disp.cuda()
                 output = net(inputs)
 
-                flow2_EPE = EPE(output, target_dis)
+                flow2_EPE = EPE(output, depths.cuda())
 
                 train_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
@@ -165,10 +165,10 @@ if __name__ == '__main__':
 
                     # target_disp = torch.sqrt(target_disp.unsqueeze(dim=1)).cuda()
                     target_dis = depths.unsqueeze(dim=1) / 1000
-                    inputs = target_disp
+                    inputs = target_disp.cuda()
                     output = net(inputs)
 
-                    flow2_EPE = EPE(output, target_dis)
+                    flow2_EPE = EPE(output, depths.cuda())
 
                     test_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
