@@ -194,7 +194,7 @@ if __name__ == '__main__':
                                               output[0].cpu() / 256,
                                               label[0].cpu() / 256,
                                               diff.cpu(),
-                                              0).unsqueeze(1)
+                                              0).unsqueeze(1))
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
                                          img_tensor=grid, global_step=prev_cycles + k,
