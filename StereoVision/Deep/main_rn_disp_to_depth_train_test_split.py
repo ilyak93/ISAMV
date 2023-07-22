@@ -135,7 +135,7 @@ if __name__ == '__main__':
                 inputs = target_disp.cuda()
                 output = net(inputs)
 
-                flow2_EPE = EPE(output, depths.cuda())
+                flow2_EPE = EPE(output["out"], depths.cuda())
 
                 train_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
@@ -168,7 +168,7 @@ if __name__ == '__main__':
                     inputs = target_disp.cuda()
                     output = net(inputs)
 
-                    flow2_EPE = EPE(output, depths.cuda())
+                    flow2_EPE = EPE(output["out"], depths.cuda())
 
                     test_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
