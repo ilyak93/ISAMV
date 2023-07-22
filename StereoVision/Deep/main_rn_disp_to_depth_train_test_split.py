@@ -131,11 +131,11 @@ if __name__ == '__main__':
 
 
                 # target_disp = torch.sqrt(target_disp.unsqueeze(dim=1)).cuda()
-                target_dis = depths.unsqueeze(dim=1) / 1000
+                label = depths.unsqueeze(dim=1).cuda() / 1000
                 inputs = target_disp.cuda()
-                output = net(inputs)
+                output = net(inputs)["out"]
 
-                flow2_EPE = EPE(output["out"], depths.cuda())
+                flow2_EPE = EPE(output, label)
 
                 train_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
@@ -164,11 +164,11 @@ if __name__ == '__main__':
                     target_disp /= 2 ** 8
 
                     # target_disp = torch.sqrt(target_disp.unsqueeze(dim=1)).cuda()
-                    target_dis = depths.unsqueeze(dim=1) / 1000
+                    label = depths.unsqueeze(dim=1).cuda() / 1000
                     inputs = target_disp.cuda()
-                    output = net(inputs)
+                    output = net(inputs)["out"]
 
-                    flow2_EPE = EPE(output["out"], depths.cuda())
+                    flow2_EPE = EPE(output, label)
 
                     test_flow2_EPEs.update(flow2_EPE.data.item(), inputs.size(0))
 
@@ -182,7 +182,7 @@ if __name__ == '__main__':
                                               right_img[0].cpu(),
                                               torch.tensor(histogram_equalize(target_dis[0].cpu().numpy())),
                                               output[0].cpu() / 256,
-                                              torch.abs(target_dis[0].cpu() / 256 -
+                                              torch.abs(label[0].cpu() / 256 -
                                                         output.cpu() / 256)),
                                              0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
