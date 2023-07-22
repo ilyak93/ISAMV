@@ -184,13 +184,16 @@ if __name__ == '__main__':
                         
                         eq_disp = torch.tensor(histogram_equalize(inputs[0].cpu().numpy()))
                         
+                        indices = label[0] != 0
+                        diff = torch.zeros_like(eq_disp)
+                        diff[indices] = torch.abs(label[0][indices] - output[0][indices]) / 256
+                        
                         orig_viz = torch.cat((left_img[0].cpu().unsqueeze(0) / 2 ** 16,
                                               right_img[0].cpu().unsqueeze(0) / 2 ** 16,
                                               eq_disp,
                                               output[0].cpu() / 256,
                                               label[0].cpu() / 256,
-                                              torch.abs(label[0].cpu() / 256 -
-                                                        output[0].cpu() / 256)),
+                                              diff.cpu(),
                                               0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
