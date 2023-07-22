@@ -66,7 +66,7 @@ if __name__ == '__main__':
     test_dataloader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=4)
 
     in_channels = 1
-    net = fcn_resnet101(pretrained=True)
+    net = fcn_resnet101(pretrained=False)
     backbone_first_conv = net.backbone.conv1
     net.backbone.conv1 = nn.Conv2d(in_channels=in_channels,
                                    out_channels=backbone_first_conv.out_channels,
@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
     beta = 0.999
     momentum = 0.9
-    lr = 0.0000005
+    lr = 0.00001
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr,
                                  betas=(momentum, beta), amsgrad=True)
     decayRate = 0.98
@@ -191,7 +191,7 @@ if __name__ == '__main__':
                                               label[0].cpu() / 256,
                                               torch.abs(label[0].cpu() / 256 -
                                                         output[0].cpu() / 256)),
-                                             0).unsqueeze(1)
+                                              0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
                                          img_tensor=grid, global_step=prev_cycles + k,
