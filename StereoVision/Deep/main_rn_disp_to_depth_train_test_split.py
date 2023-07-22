@@ -180,7 +180,7 @@ if __name__ == '__main__':
                         writer.add_scalar("test/per_10_iterations/EPE", flow2_EPE.data.item(), j)
                         orig_viz = torch.cat((left_img[0].cpu(),
                                               right_img[0].cpu(),
-                                              torch.tensor(histogram_equalize(target_dis[0].cpu().numpy())),
+                                              torch.tensor(histogram_equalize(inputs[0].cpu().numpy())),
                                               output[0].cpu() / 256,
                                               torch.abs(label[0].cpu() / 256 -
                                                         output.cpu() / 256)),
