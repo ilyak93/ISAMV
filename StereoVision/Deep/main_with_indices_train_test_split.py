@@ -49,7 +49,6 @@ if __name__ == '__main__':
         img_dir="/content/data/test/",
         transform=False
     )
-    test_size = 50
 
     from torch.utils.data import DataLoader
 
