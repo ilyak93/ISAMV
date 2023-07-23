@@ -194,7 +194,7 @@ if __name__ == '__main__':
                         eq_disp = torch.tensor(histogram_equalize(inputs[0].cpu().numpy()))
                         
                         indices = label[0] != 0
-                        diff = torch.zeros_like(eq_disp)
+                        diff = torch.zeros_like(eq_disp).cuda()
                         diff[indices] = torch.abs(label[0][indices] - output[0][indices]) / 256
                         
                         orig_viz = torch.cat((left_img[0].cpu().unsqueeze(0) / 2 ** 16,
