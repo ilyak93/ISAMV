@@ -183,13 +183,18 @@ if __name__ == '__main__':
                         #    r, i, loss=losses, flow2_EPE=flow2_EPEs))
                         writer.add_scalar("test/per_10_iterations/loss", loss.data.item(), j)
                         writer.add_scalar("test/per_10_iterations/EPE", flow2_EPE.data.item(), j)
+                        
+                        indices = label[0] != 0
+                        diff = torch.zeros_like(eq_disp).cuda()
+                        diff[indices] = torch.abs(label[0][indices] - output[0][indices]) / 256
+                        
                         orig_viz = torch.cat((left_img[0].cpu(),
                                               right_img[0].cpu(),
                                               target_dis[0].cpu() / 256,
                                               output_net2[0].cpu() / 256,
-                                              torch.abs(target_dis[0].cpu() / 256 -
-                                                        output_net2[0].cpu() / 256)),
+                                              diff.cpu(),
                                              0).unsqueeze(1)
+                                             
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
                                          img_tensor=grid, global_step=prev_cycles + k,
