@@ -42,11 +42,11 @@ if __name__ == '__main__':
 
 
     train_set = CustomImageDataset(
-        img_dir="/content/data/train/",
+        img_dir="/content/dance_data/train/",
         transform=True
     )
     val_set = CustomImageDataset(
-        img_dir="/content/data/test/",
+        img_dir="/content/dance_data/test/",
         transform=False
     )
 
@@ -154,7 +154,6 @@ if __name__ == '__main__':
                 for [left_img, right_img], [target_disp, depths] in test_dataloader:
                     left_img = left_img.unsqueeze(dim=1) / max_uint16
                     right_img = right_img.unsqueeze(dim=1) / max_uint16
-
                     actual_batch_size = left_img.size(0)
                     row_indices_feature = torch.tensor(list(range(rows))).reshape([-1, 1]).repeat(1, cols).unsqueeze(
                         0).repeat(actual_batch_size, 1, 1).unsqueeze(1) / rows
@@ -184,16 +183,15 @@ if __name__ == '__main__':
                         writer.add_scalar("test/per_10_iterations/loss", loss.data.item(), j)
                         writer.add_scalar("test/per_10_iterations/EPE", flow2_EPE.data.item(), j)
                         
-                        indices = label[0] != 0
-                        diff = torch.zeros_like(eq_disp).cuda()
-                        diff[indices] = torch.abs(label[0][indices] - output[0][indices]) / 256
+                        indices = target_dis[0] != 0
+                        diff = torch.zeros_like(target_dis[0]).cuda()
+                        diff[indices] = torch.abs(target_dis[0][indices] - output_net2[0][indices]) / 256
                         
                         orig_viz = torch.cat((left_img[0].cpu(),
                                               right_img[0].cpu(),
                                               output_net2[0].cpu() / 256,
                                               target_dis[0].cpu() / 256,
-                                              diff.cpu(),
-                                             0).unsqueeze(1)
+                                              diff.cpu()), 0).unsqueeze(1)
                                              
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
