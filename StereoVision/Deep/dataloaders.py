@@ -75,6 +75,7 @@ class CustomImageDataset(Dataset):
             if random.random() < 0.5:
                 left_image, right_image, disparity, depth = \
                 np.fliplr(left_image), np.fliplr(right_image), np.fliplr(disparity), np.fliplr(depth)
+            '''
             if random.random() < 0.5:
                 mu, sigma = 0, 2000 # mean and standard deviation
                 r = np.random.normal(mu, sigma, left_image.shape)
@@ -96,4 +97,5 @@ class CustomImageDataset(Dataset):
             if random.random() < 0.5:
                 left_image, right_image =
                 histogram_equalize(left_image), histogram_equalize(right_image)
+            '''
         return [left_image.copy(), right_image.copy()], [disparity.copy(), depth.copy()]
