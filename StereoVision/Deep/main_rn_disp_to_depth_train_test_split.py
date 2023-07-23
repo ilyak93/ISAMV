@@ -126,7 +126,7 @@ if __name__ == '__main__':
         chkp = "epoch_96_loss_0.36047223329544065"
         PATH = gen_path + chkp
         checkpoint = torch.load(PATH)
-        model.load_state_dict(checkpoint['model_state_dict'])
+        net.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     for r in range(startRound, len(FADNet_loss_config["epoches"])):
