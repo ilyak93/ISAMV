@@ -213,5 +213,8 @@ if __name__ == '__main__':
                 previous_EPE = test_flow2_EPEs.avg
                 prev_chkpnt = "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(
                     test_flow2_EPEs.avg)
+            demo = open("/content/drive/MyDrive/Deep/demofile.txt", "w")
+            demo.write("Ilya " + str(prev_cycles + k))
+            demo.close()
 
         prev_cycles = prev_cycles + FADNet_loss_config["epoches"][max(0, r - 1)]
