@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     train_set = CustomImageDataset(
         img_dir="/content/data/train/",
-        transform=False
+        transform=True
     )
     val_set = CustomImageDataset(
         img_dir="/content/data/test/",
