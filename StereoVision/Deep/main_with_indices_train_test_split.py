@@ -190,8 +190,8 @@ if __name__ == '__main__':
                         
                         orig_viz = torch.cat((left_img[0].cpu(),
                                               right_img[0].cpu(),
-                                              target_dis[0].cpu() / 256,
                                               output_net2[0].cpu() / 256,
+                                              target_dis[0].cpu() / 256,
                                               diff.cpu(),
                                              0).unsqueeze(1)
                                              
