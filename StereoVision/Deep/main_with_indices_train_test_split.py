@@ -187,11 +187,21 @@ if __name__ == '__main__':
                         diff = torch.zeros_like(target_dis[0]).cuda()
                         diff[indices] = torch.abs(target_dis[0][indices] - output_net2[0][indices]) / 256
                         
+
+                        diff_eq = torch.tensor(histogram_equalize(diff.cpu().numpy()))
+
+                        output = torch.tensor(histogram_equalize((output_net2[0].cpu() / 256).numpy()))
+                        
+                        label = torch.tensor(histogram_equalize((target_dis[0].cpu() / 256).numpy()))
+
                         orig_viz = torch.cat((left_img[0].cpu(),
                                               right_img[0].cpu(),
                                               output_net2[0].cpu() / 256,
                                               target_dis[0].cpu() / 256,
-                                              diff.cpu()), 0).unsqueeze(1)
+                                              output, 
+                                              label, 
+                                              diff.cpu(),
+                                              diff_eq), 0).unsqueeze(1)
                                              
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
