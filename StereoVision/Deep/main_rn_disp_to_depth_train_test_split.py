@@ -51,11 +51,11 @@ if __name__ == '__main__':
 
 
     train_set = CustomImageDataset(
-        img_dir="/content/data/train/",
+        img_dir="/content/dance_data/train/",
         transform=True
     )
     val_set = CustomImageDataset(
-        img_dir="/content/data/test/",
+        img_dir="/content/dance_data/test/",
         transform=False
     )
 
@@ -121,7 +121,7 @@ if __name__ == '__main__':
 
     prev_chkpnt = ""
     
-    pretrain=True
+    pretrain=False
     if pretrain:
         chkp = "epoch_96_loss_0.36047223329544065"
         PATH = gen_path + chkp
@@ -196,13 +196,15 @@ if __name__ == '__main__':
                         indices = label[0] != 0
                         diff = torch.zeros_like(eq_disp).cuda()
                         diff[indices] = torch.abs(label[0][indices] - output[0][indices]) / 256
-                        
+
+                        diff = torch.tensor(histogram_equalize(diff.cpu().numpy()))
+
                         orig_viz = torch.cat((left_img[0].cpu().unsqueeze(0) / 2 ** 16,
                                               right_img[0].cpu().unsqueeze(0) / 2 ** 16,
                                               eq_disp,
                                               output[0].cpu() / 256,
                                               label[0].cpu() / 256,
-                                              diff.cpu()), 0).unsqueeze(1)
+                                              diff), 0).unsqueeze(1)
                         grid = torchvision.utils.make_grid(orig_viz)
                         writer.add_image(tag='Test_images/image_' + str(j % 13),
                                          img_tensor=grid, global_step=prev_cycles + k,
