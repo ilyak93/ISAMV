@@ -15,6 +15,10 @@ import torchvision.transforms as T
 
 from torch.utils.tensorboard import SummaryWriter
 
+def histogram_equalize(img):
+    img_cdf, bin_centers = exposure.cumulative_distribution(img)
+    return np.interp(img, bin_centers, img_cdf).astype(np.float32)
+
 # tensorboard --logdir runs
 
 if __name__ == '__main__':
