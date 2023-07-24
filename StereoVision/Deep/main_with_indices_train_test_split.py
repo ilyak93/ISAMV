@@ -99,6 +99,14 @@ if __name__ == '__main__':
     prev_cycles = 0
 
     prev_chkpnt = ""
+    
+    pretrain=False
+    if pretrain:
+        chkp = "epoch_96_loss_0.36047223329544065"
+        PATH = gen_path + chkp
+        checkpoint = torch.load(PATH)
+        net.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     for r in range(startRound, len(FADNet_loss_config["epoches"])):
         cycles = FADNet_loss_config["epoches"][r]
