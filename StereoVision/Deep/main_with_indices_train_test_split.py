@@ -15,6 +15,9 @@ import torchvision.transforms as T
 
 from torch.utils.tensorboard import SummaryWriter
 
+from skimage import exposure
+import numpy as np
+
 def histogram_equalize(img):
     img_cdf, bin_centers = exposure.cumulative_distribution(img)
     return np.interp(img, bin_centers, img_cdf).astype(np.float32)
@@ -85,7 +88,9 @@ if __name__ == '__main__':
     train_losses = AverageMeter()
     train_flow2_EPEs = AverageMeter()
 
-    writer = SummaryWriter("/content/drive/MyDrive/Deep/")
+    gen_path = "/content/drive/MyDrive/Deep/"
+
+    writer = SummaryWriter(gen_path)
     i = 0
     j = 0
     cycles = 2
@@ -99,10 +104,10 @@ if __name__ == '__main__':
     prev_cycles = 0
 
     prev_chkpnt = ""
-    
+
     pretrain=False
     if pretrain:
-        chkp = "epoch_96_loss_0.36047223329544065"
+        chkp = "epoch_199_loss_1.6628163054182723"
         PATH = gen_path + chkp
         checkpoint = torch.load(PATH)
         net.load_state_dict(checkpoint['model_state_dict'])
@@ -115,6 +120,7 @@ if __name__ == '__main__':
             for [left_img, right_img], [target_disp, depths] in train_dataloader:
                 left_img = left_img.unsqueeze(dim=1) / max_uint16
                 right_img = right_img.unsqueeze(dim=1) / max_uint16
+                
                 actual_batch_size = left_img.size(0)
                 row_indices_feature = torch.tensor(list(range(rows))).reshape([-1, 1]).repeat(1, cols).unsqueeze(
                     0).repeat(actual_batch_size, 1, 1).unsqueeze(1) / rows
@@ -166,6 +172,7 @@ if __name__ == '__main__':
                 for [left_img, right_img], [target_disp, depths] in test_dataloader:
                     left_img = left_img.unsqueeze(dim=1) / max_uint16
                     right_img = right_img.unsqueeze(dim=1) / max_uint16
+                    
                     actual_batch_size = left_img.size(0)
                     row_indices_feature = torch.tensor(list(range(rows))).reshape([-1, 1]).repeat(1, cols).unsqueeze(
                         0).repeat(actual_batch_size, 1, 1).unsqueeze(1) / rows
