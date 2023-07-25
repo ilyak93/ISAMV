@@ -112,7 +112,12 @@ if __name__ == '__main__':
         checkpoint = torch.load(PATH)
         net.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    
+    duration = 1800  # 1 minute
 
+    # Run the script for the specified duration
+    start_time = time.time()
+    
     for r in range(startRound, len(FADNet_loss_config["epoches"])):
         cycles = FADNet_loss_config["epoches"][r]
         for k in range(cycles):
@@ -244,6 +249,10 @@ if __name__ == '__main__':
                 previous_EPE = test_flow2_EPEs.avg
                 prev_chkpnt = "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(
                     test_flow2_EPEs.avg)
+            if time.time() - start_time >= duration:
+                  writer = SummaryWriter(gen_path)
+                  time.sleep(120)
+                  start_time = time.time()
             demo = open("/content/drive/MyDrive/Deep/demofile.txt", "w")
             demo.write("Ilya " + str(prev_cycles + k))
             demo.close()
