@@ -1,4 +1,5 @@
 import os
+import time
 
 import matplotlib
 import torch
@@ -120,10 +121,14 @@ if __name__ == '__main__':
     prev_cycles = 0
 
     prev_chkpnt = ""
+
+    duration = 1800 #30 min
+
+    start_time = time.time()
     
     pretrain=False
     if pretrain:
-        chkp = "epoch_96_loss_0.36047223329544065"
+        chkp = "epoch_46_loss_1.5988718271255493"
         PATH = gen_path + chkp
         checkpoint = torch.load(PATH)
         net.load_state_dict(checkpoint['model_state_dict'])
@@ -226,6 +231,11 @@ if __name__ == '__main__':
                 previous_EPE = test_flow2_EPEs.avg
                 prev_chkpnt = "/content/drive/MyDrive/Deep/" + "epoch_" + str(prev_cycles + k) + "_loss_" + str(
                     test_flow2_EPEs.avg)
+            if time.time() - start_time >= duration:
+                writer = SummaryWriter(gen_path)
+                time.sleep(120)
+                start_time = time.time()
+                
             demo = open("/content/drive/MyDrive/Deep/demofile.txt", "w")
             demo.write("Ilya " + str(prev_cycles + k))
             demo.close()
